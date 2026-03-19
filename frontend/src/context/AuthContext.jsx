@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
+import { getMe } from '../services/authService'
 
 const AuthContext = createContext(null)
 
@@ -8,8 +9,18 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // TODO: validate token and fetch current user on mount
-    setLoading(false)
+    if (!token) {
+      setLoading(false)
+      return
+    }
+
+    getMe()
+      .then((res) => setUser(res.data))
+      .catch(() => {
+        setToken(null)
+        localStorage.removeItem('token')
+      })
+      .finally(() => setLoading(false))
   }, [token])
 
   const login = (userData, jwt) => {
