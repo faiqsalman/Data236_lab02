@@ -1,1 +1,74 @@
 @import "tailwindcss";
+
+/* ── Custom fonts ─────────────────────────────────────────────────────────── */
+@theme {
+  --font-poppins: 'Poppins', sans-serif;
+  --font-opensans: 'Open Sans', sans-serif;
+}
+
+/* ── Yelp Type Scale ──────────────────────────────────────────────────────────
+   Use these classes throughout the project for consistent typography.
+
+   Headings (Poppins Bold)
+     .yelp-h1   48px / 56px
+     .yelp-h2   28px / 36px
+     .yelp-h3   24px / 32px
+     .yelp-h4   20px / 28px
+
+   Body Display (Poppins)
+     .yelp-b1-display-bold    16px / 24px  700
+     .yelp-b1-display-med     16px / 24px  500
+     .yelp-b2-display-bold    14px / 20px  700
+     .yelp-b2-display-med     14px / 20px  500
+
+   Body Text (Open Sans)
+     .yelp-b1-bold    16px / 24px  700
+     .yelp-b1-semi    16px / 24px  600
+     .yelp-b1         16px / 24px  400
+     .yelp-b2-bold    14px / 20px  700
+     .yelp-b2-semi    14px / 20px  600
+     .yelp-b2         14px / 20px  400
+     .yelp-b3-bold    12px / 16px  700
+     .yelp-b3-semi    12px / 16px  600
+     .yelp-b3         12px / 16px  400
+     .yelp-b4-bold    10px / 12px  700
+     .yelp-b4-semi    10px / 12px  600
+     .yelp-b4         10px / 12px  400
+────────────────────────────────────────────────────────────────────────────── */
+
+/* Headings — Poppins Bold */
+.yelp-h1 { font-family: 'Poppins', sans-serif; font-size: 48px; line-height: 56px; font-weight: 700; }
+.yelp-h2 { font-family: 'Poppins', sans-serif; font-size: 28px; line-height: 36px; font-weight: 700; }
+.yelp-h3 { font-family: 'Poppins', sans-serif; font-size: 24px; line-height: 32px; font-weight: 700; }
+.yelp-h4 { font-family: 'Poppins', sans-serif; font-size: 20px; line-height: 28px; font-weight: 700; }
+
+/* Body Display — Poppins */
+.yelp-b1-display-bold { font-family: 'Poppins', sans-serif; font-size: 16px; line-height: 24px; font-weight: 700; }
+.yelp-b1-display-med  { font-family: 'Poppins', sans-serif; font-size: 16px; line-height: 24px; font-weight: 500; }
+.yelp-b2-display-bold { font-family: 'Poppins', sans-serif; font-size: 14px; line-height: 20px; font-weight: 700; }
+.yelp-b2-display-med  { font-family: 'Poppins', sans-serif; font-size: 14px; line-height: 20px; font-weight: 500; }
+
+/* Body Text — Open Sans */
+.yelp-b1-bold { font-family: 'Open Sans', sans-serif; font-size: 16px; line-height: 24px; font-weight: 700; }
+.yelp-b1-semi { font-family: 'Open Sans', sans-serif; font-size: 16px; line-height: 24px; font-weight: 600; }
+.yelp-b1      { font-family: 'Open Sans', sans-serif; font-size: 16px; line-height: 24px; font-weight: 400; }
+
+.yelp-b2-bold { font-family: 'Open Sans', sans-serif; font-size: 14px; line-height: 20px; font-weight: 700; }
+.yelp-b2-semi { font-family: 'Open Sans', sans-serif; font-size: 14px; line-height: 20px; font-weight: 600; }
+.yelp-b2      { font-family: 'Open Sans', sans-serif; font-size: 14px; line-height: 20px; font-weight: 400; }
+
+.yelp-b3-bold { font-family: 'Open Sans', sans-serif; font-size: 12px; line-height: 16px; font-weight: 700; }
+.yelp-b3-semi { font-family: 'Open Sans', sans-serif; font-size: 12px; line-height: 16px; font-weight: 600; }
+.yelp-b3      { font-family: 'Open Sans', sans-serif; font-size: 12px; line-height: 16px; font-weight: 400; }
+
+.yelp-b4-bold { font-family: 'Open Sans', sans-serif; font-size: 10px; line-height: 12px; font-weight: 700; }
+.yelp-b4-semi { font-family: 'Open Sans', sans-serif; font-size: 10px; line-height: 12px; font-weight: 600; }
+.yelp-b4      { font-family: 'Open Sans', sans-serif; font-size: 10px; line-height: 12px; font-weight: 400; }
+
+/* ── Global base styles ───────────────────────────────────────────────────── */
+body {
+  font-family: 'Open Sans', sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  color: #1a1a1a;
+}
