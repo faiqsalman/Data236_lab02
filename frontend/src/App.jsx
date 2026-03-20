@@ -29,12 +29,12 @@ function App() {
 
             {/* Protected */}
             <Route element={<ProtectedRoute />}>
-              <Route path="/restaurants/new" element={<AddRestaurant />} />
               <Route path="/assistant" element={<AIAssistant />} />
             </Route>
 
             {/* Temporarily public for frontend dev (no backend yet) */}
             <Route path="/profile" element={<Profile />} />
+            <Route path="/restaurants/new" element={<AddRestaurant />} />
           </Routes>
         </main>
       </BrowserRouter>
