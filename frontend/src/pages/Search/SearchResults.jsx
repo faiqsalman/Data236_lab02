@@ -3,6 +3,181 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import PageHeader from '../../components/layout/PageHeader'
 import Footer from '../../components/layout/Footer'
 
+/* ─── Mock AI responses ───────────────────────────────────────────── */
+const SUGGESTED_PROMPTS = [
+  'Find me a romantic Italian restaurant under $50',
+  'Best brunch spots open on Sunday',
+  'Top-rated sushi near Downtown',
+  'Where should I go for a business dinner?',
+  'Compare The Golden Fork vs Sakura Garden',
+]
+
+const MOCK_AI_RESPONSES = {
+  default: (q) => `Great question! Based on the restaurants in your area, here are my top picks for "${q}":\n\n**1. The Golden Fork** — Exceptional Italian cuisine with a romantic ambiance. Perfect for a special night out. Rating: 4.8★\n\n**2. Sakura Garden** — Outstanding sushi and omakase experience in West Hollywood. Rating: 4.7★\n\n**3. Harbor Light Bistro** — Fresh seafood with stunning waterfront views in Marina del Rey. Rating: 4.7★\n\nWould you like more details about any of these, or should I filter by price, cuisine, or location?`,
+  romantic: () => `For a romantic dinner in Los Angeles, I'd recommend:\n\n**1. Maison Blanche** (Beverly Hills) — White-glove French fine dining with an intimate atmosphere. Prix fixe menu is exquisite. $$$$\n\n**2. The Golden Fork** (Downtown) — Candlelit Italian with housemade pasta. Perfect for anniversaries. $$\n\n**3. Harbor Light Bistro** (Marina del Rey) — Waterfront views at sunset are absolutely stunning. $$$\n\nShall I check availability for any of these?`,
+  brunch: () => `Top brunch spots currently open in your area:\n\n**1. The Fig Tree Café** (Los Feliz) — Best eggs benedict in the city. Gorgeous outdoor patio. $$\n\n**2. Blue Moon Diner** (Hollywood) — Classic American diner, open 24 hours. Famous for fluffy pancakes. $\n\n**3. Harbor Light Bistro** (Marina del Rey) — Upscale brunch with bottomless mimosas and ocean views. $$$\n\nAll three are highly rated and open right now!`,
+  compare: () => `**The Golden Fork vs. Sakura Garden** — here's the breakdown:\n\n| | The Golden Fork | Sakura Garden |\n|---|---|---|\n| Cuisine | Italian | Japanese/Sushi |\n| Rating | ⭐ 4.8 | ⭐ 4.7 |\n| Price | $$ | $$ |\n| Best for | Date night, fine dining | Omakase, sake bar |\n| Wait time | ~20 min | ~35 min |\n\n**My pick:** The Golden Fork for a classic romantic dinner; Sakura Garden if you want an adventurous omakase experience.`,
+}
+
+function getAIResponse(message) {
+  const lower = message.toLowerCase()
+  if (lower.includes('romantic') || lower.includes('date')) return MOCK_AI_RESPONSES.romantic()
+  if (lower.includes('brunch') || lower.includes('breakfast') || lower.includes('sunday')) return MOCK_AI_RESPONSES.brunch()
+  if (lower.includes('compare') || lower.includes('vs') || lower.includes('versus')) return MOCK_AI_RESPONSES.compare()
+  return MOCK_AI_RESPONSES.default(message)
+}
+
+/* ─── AI Assistant Panel ──────────────────────────────────────────── */
+function AIAssistantPanel({ query, location }) {
+  const [messages, setMessages] = useState([
+    {
+      role: 'assistant',
+      text: `Hi! I'm your Yelp AI Assistant. I can help you find the perfect restaurant in **${location}**. Ask me anything — cuisine type, budget, occasion, dietary needs, or even compare specific places!`,
+    },
+  ])
+  const [input, setInput]       = useState('')
+  const [loading, setLoading]   = useState(false)
+  const bottomRef               = useRef(null)
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  const sendMessage = (text) => {
+    if (!text.trim()) return
+    const userMsg = { role: 'user', text: text.trim() }
+    setMessages((m) => [...m, userMsg])
+    setInput('')
+    setLoading(true)
+    // Simulate API delay — replace with real API call when backend is ready
+    setTimeout(() => {
+      setMessages((m) => [...m, { role: 'assistant', text: getAIResponse(text) }])
+      setLoading(false)
+    }, 900)
+  }
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    sendMessage(input)
+  }
+
+  // Simple markdown bold renderer
+  const renderText = (text) =>
+    text.split('\n').map((line, i) => {
+      const parts = line.split(/\*\*(.*?)\*\*/g)
+      return (
+        <p key={i} className={`${line === '' ? 'mt-2' : ''}`}>
+          {parts.map((part, j) =>
+            j % 2 === 1 ? <strong key={j}>{part}</strong> : part
+          )}
+        </p>
+      )
+    })
+
+  return (
+    <div className="flex flex-col h-full bg-white">
+
+      {/* Panel header */}
+      <div className="px-5 py-4 border-b border-gray-200 bg-white">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full bg-[#d32323] flex items-center justify-center shrink-0">
+            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-8v4h4l-5 8z"/>
+            </svg>
+          </div>
+          <div>
+            <p className="yelp-b3-bold text-gray-900">Yelp AI Assistant</p>
+            <p className="yelp-b4 text-green-600 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+              Online
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        {messages.map((msg, i) => (
+          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            {msg.role === 'assistant' && (
+              <div className="w-7 h-7 rounded-full bg-[#d32323] flex items-center justify-center shrink-0 mt-1 mr-2">
+                <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-8v4h4l-5 8z"/>
+                </svg>
+              </div>
+            )}
+            <div
+              className={`max-w-[82%] px-4 py-3 rounded-2xl yelp-b4 leading-relaxed space-y-0.5 ${
+                msg.role === 'user'
+                  ? 'bg-[#d32323] text-white rounded-tr-sm'
+                  : 'bg-gray-100 text-gray-800 rounded-tl-sm'
+              }`}
+            >
+              {renderText(msg.text)}
+            </div>
+          </div>
+        ))}
+
+        {loading && (
+          <div className="flex justify-start">
+            <div className="w-7 h-7 rounded-full bg-[#d32323] flex items-center justify-center shrink-0 mt-1 mr-2">
+              <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-8v4h4l-5 8z"/>
+              </svg>
+            </div>
+            <div className="bg-gray-100 px-4 py-3 rounded-2xl rounded-tl-sm flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Suggested prompts — only show if only 1 message (intro) */}
+      {messages.length === 1 && (
+        <div className="px-4 pb-3">
+          <p className="yelp-b4 text-gray-400 mb-2">Try asking:</p>
+          <div className="flex flex-col gap-1.5">
+            {SUGGESTED_PROMPTS.map((prompt) => (
+              <button
+                key={prompt}
+                onClick={() => sendMessage(prompt)}
+                className="text-left yelp-b4 text-[#d32323] bg-red-50 border border-red-100 rounded-lg px-3 py-2 hover:bg-red-100 transition-colors"
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Input */}
+      <div className="px-4 pb-4 pt-2 border-t border-gray-200">
+        <form onSubmit={handleSubmit} className="flex gap-2">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask about restaurants…"
+            className="flex-1 border border-gray-300 rounded-full px-4 py-2.5 yelp-b4 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#d32323]"
+          />
+          <button
+            type="submit"
+            disabled={!input.trim() || loading}
+            className="w-10 h-10 rounded-full bg-[#d32323] flex items-center justify-center text-white hover:bg-red-700 disabled:opacity-40 shrink-0"
+          >
+            <svg className="w-4 h-4 rotate-90" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+            </svg>
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 /* ─── Mock Data ───────────────────────────────────────────────── */
 const MOCK_RESTAURANTS = [
   { id: 1, rank: 1, name: 'The Golden Fork', rating: 4.8, reviewCount: 1243, neighborhood: 'Downtown', price: '$$', isOpen: true, hours: 'Closes 10:00 PM', reviewSnippet: 'Absolutely incredible experience from start to finish. The pasta was perfectly al dente and the service was impeccable. We\'ll definitely be back for special occasions — the ambiance alone is worth a visit...', tags: ['Italian', 'Pasta', 'Date Night', 'Fine Dining'] },
@@ -138,6 +313,7 @@ export default function SearchResults() {
   const [activeFilters, setActiveFilters]     = useState({ openNow: false, reservations: false, waitlist: false, delivery: false, takeout: false })
   const [searchAsMapMoves, setSearchAsMapMoves] = useState(true)
   const [currentPage, setCurrentPage]         = useState(1)
+  const [showAssistant, setShowAssistant]     = useState(false)
 
   const allFiltersRef = useRef(null)
 
@@ -285,6 +461,17 @@ export default function SearchResults() {
             <button onClick={() => toggleFilter('waitlist')}   className={filterBtnCls(activeFilters.waitlist)}>Offers Online Waitlist</button>
             <button onClick={() => toggleFilter('delivery')}   className={filterBtnCls(activeFilters.delivery)}>Offers Delivery</button>
             <button onClick={() => toggleFilter('takeout')}    className={filterBtnCls(activeFilters.takeout)}>Offers Takeout</button>
+
+            {/* AI Assistant toggle */}
+            <button
+              onClick={() => setShowAssistant((v) => !v)}
+              className={`ml-auto flex items-center gap-2 yelp-b2 px-5 py-2 rounded-full border whitespace-nowrap transition-colors ${showAssistant ? 'bg-[#d32323] border-[#d32323] text-white' : 'border-[#d32323] text-[#d32323] hover:bg-red-50'}`}
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-8v4h4l-5 8z"/>
+              </svg>
+              {showAssistant ? 'Hide Assistant' : 'Ask Assistant'}
+            </button>
           </div>
 
           <hr className="my-6 border-gray-200" />
@@ -372,10 +559,16 @@ export default function SearchResults() {
 
         </div>
 
-        {/* ══ RIGHT: Map column ═════════════════════════════════ */}
-        <div className="flex-1 sticky top-[72px] h-[calc(100vh-72px)] bg-gray-200 overflow-hidden">
-          {/* Map placeholder */}
-          <div className="relative w-full h-full">
+        {/* ══ RIGHT: Map or AI Assistant column ════════════════ */}
+        <div className={`flex-1 sticky top-[72px] h-[calc(100vh-72px)] overflow-hidden ${showAssistant ? 'bg-white border-l border-gray-200' : 'bg-gray-200'}`}>
+
+          {/* AI Assistant Panel */}
+          {showAssistant && (
+            <AIAssistantPanel query={query} location={location} />
+          )}
+
+          {/* Map — hidden when assistant is open */}
+          <div className={`relative w-full h-full ${showAssistant ? 'hidden' : ''}`}>
             {/* Simulated map background */}
             <div className="w-full h-full bg-gradient-to-br from-gray-100 via-green-50 to-blue-50 relative">
               {/* Grid lines to simulate map */}
