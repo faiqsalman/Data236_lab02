@@ -3,6 +3,174 @@ import { Link } from 'react-router-dom'
 import PageHeader from '../../components/layout/PageHeader'
 import Footer from '../../components/layout/Footer'
 
+/* ─────────────────────────── constants ─────────────────────────── */
+const US_STATES = [
+  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN',
+  'IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV',
+  'NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN',
+  'TX','UT','VT','VA','WA','WV','WI','WY',
+]
+
+const COUNTRIES = [
+  'United States','Canada','United Kingdom','Australia','France','Germany',
+  'Japan','South Korea','Mexico','Brazil','India','China','Italy','Spain',
+  'Netherlands','Sweden','Switzerland','New Zealand','Singapore','Other',
+]
+
+const LANGUAGES = [
+  'English','Spanish','French','Mandarin','Cantonese','Japanese','Korean',
+  'Portuguese','German','Italian','Arabic','Hindi','Vietnamese','Tagalog',
+  'Russian','Polish','Dutch','Swedish','Other',
+]
+
+const GENDERS = ['Prefer not to say','Man','Woman','Non-binary','Transgender','Gender fluid','Other']
+
+/* ─────────────────────────── EditProfileModal ───────────────────── */
+function EditProfileModal({ user, onSave, onClose }) {
+  const [form, setForm] = useState({
+    name:      user.name      || '',
+    email:     user.email     || '',
+    phone:     user.phone     || '',
+    aboutMe:   user.aboutMe   || '',
+    city:      user.city      || '',
+    state:     user.state     || '',
+    country:   user.country   || 'United States',
+    languages: user.languages || [],
+    gender:    user.gender    || 'Prefer not to say',
+  })
+
+  const set = (key, val) => setForm((f) => ({ ...f, [key]: val }))
+
+  const toggleLanguage = (lang) =>
+    set('languages', form.languages.includes(lang)
+      ? form.languages.filter((l) => l !== lang)
+      : [...form.languages, lang])
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    onSave(form)
+    onClose()
+  }
+
+  const inputCls = 'w-full border border-gray-400 rounded-lg px-4 py-2.5 yelp-b3 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#d32323] focus:ring-1 focus:ring-[#d32323] bg-white'
+  const labelCls = 'block yelp-b3-bold text-gray-700 mb-1'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+
+      {/* Modal */}
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-xl mx-4 max-h-[90vh] flex flex-col">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-7 py-5 border-b border-gray-200">
+          <h2 className="yelp-b1-bold text-gray-900">Edit Profile</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">✕</button>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="overflow-y-auto flex-1 px-7 py-6 space-y-5">
+
+          {/* Name */}
+          <div>
+            <label className={labelCls}>Name</label>
+            <input type="text" value={form.name} onChange={(e) => set('name', e.target.value)}
+              placeholder="Your name" className={inputCls} />
+          </div>
+
+          {/* Email */}
+          <div>
+            <label className={labelCls}>Email</label>
+            <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)}
+              placeholder="you@example.com" className={inputCls} />
+          </div>
+
+          {/* Phone */}
+          <div>
+            <label className={labelCls}>Phone Number</label>
+            <input type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)}
+              placeholder="(555) 555-5555" className={inputCls} />
+          </div>
+
+          {/* About Me */}
+          <div>
+            <label className={labelCls}>About Me</label>
+            <textarea value={form.aboutMe} onChange={(e) => set('aboutMe', e.target.value)}
+              placeholder="Tell the Yelp community about yourself…" rows={3}
+              className={inputCls + ' resize-none'} />
+          </div>
+
+          {/* City */}
+          <div>
+            <label className={labelCls}>City</label>
+            <input type="text" value={form.city} onChange={(e) => set('city', e.target.value)}
+              placeholder="San Francisco" className={inputCls} />
+          </div>
+
+          {/* State */}
+          <div>
+            <label className={labelCls}>State</label>
+            <select value={form.state} onChange={(e) => set('state', e.target.value)} className={inputCls}>
+              <option value="">Select state</option>
+              {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+
+          {/* Country */}
+          <div>
+            <label className={labelCls}>Country</label>
+            <select value={form.country} onChange={(e) => set('country', e.target.value)} className={inputCls}>
+              {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          {/* Languages */}
+          <div>
+            <label className={labelCls}>Languages</label>
+            <p className="yelp-b4 text-gray-500 mb-2">Select all that apply</p>
+            <div className="flex flex-wrap gap-2">
+              {LANGUAGES.map((lang) => {
+                const selected = form.languages.includes(lang)
+                return (
+                  <button key={lang} type="button" onClick={() => toggleLanguage(lang)}
+                    className={`yelp-b4 px-3 py-1.5 rounded-full border transition-colors ${
+                      selected ? 'bg-[#d32323] border-[#d32323] text-white' : 'border-gray-300 text-gray-600 hover:border-gray-400'
+                    }`}>
+                    {lang}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Gender */}
+          <div>
+            <label className={labelCls}>Gender</label>
+            <select value={form.gender} onChange={(e) => set('gender', e.target.value)} className={inputCls}>
+              {GENDERS.map((g) => <option key={g} value={g}>{g}</option>)}
+            </select>
+          </div>
+
+        </div>
+
+        {/* Footer */}
+        <div className="px-7 py-5 border-t border-gray-200 flex gap-3">
+          <button type="button" onClick={onClose}
+            className="flex-1 border border-gray-300 rounded-lg py-2.5 yelp-b3-semi text-gray-700 hover:bg-gray-50">
+            Cancel
+          </button>
+          <button type="button" onClick={handleSubmit}
+            className="flex-1 bg-[#d32323] text-white rounded-lg py-2.5 yelp-b3-semi hover:bg-red-700">
+            Save Changes
+          </button>
+        </div>
+
+      </div>
+    </div>
+  )
+}
+
 /* ─────────────────────────── mock data ─────────────────────────── */
 const MOCK_USER = {
   name: 'Alex Johnson',
@@ -323,8 +491,14 @@ const SECTIONS = [
 ]
 
 export default function Profile() {
-  const [activeSection, setActiveSection] = useState('overview')
+  const [activeSection, setActiveSection]   = useState('overview')
   const [showCollections, setShowCollections] = useState(false)
+  const [showEditModal, setShowEditModal]   = useState(false)
+  const [user, setUser] = useState({
+    ...MOCK_USER,
+    email: '', phone: '', aboutMe: '', city: 'San Francisco',
+    state: 'CA', country: 'United States', languages: ['English'], gender: 'Prefer not to say',
+  })
 
   if (showCollections) {
     return <CollectionsPage onBack={() => setShowCollections(false)} />
@@ -351,14 +525,14 @@ export default function Profile() {
           {/* Profile card */}
           <div className="border border-gray-200 rounded-xl p-6 flex flex-col items-center text-center mb-0">
             <AvatarCircle size="lg" />
-            <p className="yelp-b1-bold text-gray-900 mt-4">{MOCK_USER.name}</p>
-            <p className="yelp-b3 text-gray-400 mt-1">{MOCK_USER.location}</p>
+            <p className="yelp-b1-bold text-gray-900 mt-4">{user.name}</p>
+            <p className="yelp-b3 text-gray-400 mt-1">{user.city}{user.state ? `, ${user.state}` : ''}</p>
 
             {/* Three action buttons */}
             <div className="flex items-start justify-center gap-6 mt-5">
               {/* Edit profile */}
               <div className="flex flex-col items-center gap-1.5">
-                <button className="w-12 h-12 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50">
+                <button onClick={() => setShowEditModal(true)} className="w-12 h-12 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50">
                   <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                       d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
@@ -428,6 +602,15 @@ export default function Profile() {
       </div>
 
       <Footer />
+
+      {/* Edit Profile Modal */}
+      {showEditModal && (
+        <EditProfileModal
+          user={user}
+          onSave={(updated) => setUser((u) => ({ ...u, ...updated, location: `${updated.city}, ${updated.state}` }))}
+          onClose={() => setShowEditModal(false)}
+        />
+      )}
     </div>
   )
 }

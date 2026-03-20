@@ -12,6 +12,7 @@ import AddRestaurant from './pages/Restaurant/AddRestaurant'
 import SearchResults from './pages/Search/SearchResults'
 import Profile from './pages/Profile/Profile'
 import AIAssistant from './pages/AI/AIAssistant'
+import WriteReview from './pages/Review/WriteReview'
 
 function App() {
   return (
@@ -35,6 +36,7 @@ function App() {
             {/* Temporarily public for frontend dev (no backend yet) */}
             <Route path="/profile" element={<Profile />} />
             <Route path="/restaurants/new" element={<AddRestaurant />} />
+            <Route path="/restaurants/:id/review" element={<WriteReview />} />
           </Routes>
         </main>
       </BrowserRouter>

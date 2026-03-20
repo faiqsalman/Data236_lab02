@@ -8,7 +8,7 @@ export default function Navbar() {
 
   // Pages with their own embedded PageHeader — hide the red Navbar
   const hideOn = ['/', '/restaurants', '/profile', '/search']
-  if (hideOn.some((p) => location.pathname === p || location.pathname.startsWith('/restaurants/') || location.pathname.startsWith('/profile') || location.pathname.startsWith('/search') || location.pathname.startsWith('/search'))) return null
+  if (hideOn.some((p) => location.pathname === p || location.pathname.startsWith('/restaurants/') || location.pathname.startsWith('/profile') || location.pathname.startsWith('/search'))) return null
 
   const handleLogout = () => {
     logout()
