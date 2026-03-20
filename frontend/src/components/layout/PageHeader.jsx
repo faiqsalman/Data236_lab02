@@ -9,9 +9,10 @@ const NAV_CATEGORIES = [
   'Health & Beauty', 'Travel & Activities', 'More',
 ]
 
-// variant="dark"  → gradient bg, white text  (used on Home hero)
-// variant="light" → white bg, dark text      (used on all other pages)
-export default function PageHeader({ variant = 'light' }) {
+// variant="dark"       → gradient bg, white text  (used on Home hero)
+// variant="light"      → white bg, dark text      (used on all other pages)
+// showProfileNav=true  → replaces auth buttons with bell + avatar (used on Profile page)
+export default function PageHeader({ variant = 'light', showProfileNav = false }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [search, setSearch] = useState({ query: '', location: '' })
@@ -80,7 +81,24 @@ export default function PageHeader({ variant = 'light' }) {
             <button className={`yelp-b2 hover:underline whitespace-nowrap ${textCls}`}>Write a Review</button>
             <button className={`yelp-b2 hover:underline whitespace-nowrap ${textCls}`}>Start a Project</button>
 
-            {user ? (
+            {showProfileNav ? (
+              /* Profile page: bell + avatar */
+              <div className="flex items-center gap-4">
+                <button className={`hover:opacity-70 ${textCls}`} title="Notifications">
+                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                </button>
+                <Link to="/profile">
+                  <div className="w-10 h-10 rounded-full bg-gray-300 border-2 border-gray-400 flex items-center justify-center overflow-hidden hover:opacity-80">
+                    <svg className="w-6 h-6 text-gray-500" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+                    </svg>
+                  </div>
+                </Link>
+              </div>
+            ) : user ? (
               <>
                 <Link to="/profile" className={`yelp-b2 hover:underline ${textCls}`}>Profile</Link>
                 <button
