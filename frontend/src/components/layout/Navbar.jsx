@@ -6,8 +6,9 @@ export default function Navbar() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Home page has its own embedded header
-  if (location.pathname === '/') return null
+  // Pages with their own embedded PageHeader — hide the red Navbar
+  const hideOn = ['/', '/restaurants']
+  if (hideOn.some((p) => location.pathname === p || location.pathname.startsWith('/restaurants/'))) return null
 
   const handleLogout = () => {
     logout()

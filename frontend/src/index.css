@@ -37,38 +37,38 @@
 ────────────────────────────────────────────────────────────────────────────── */
 
 /* Headings — Poppins Bold */
-.yelp-h1 { font-family: 'Poppins', sans-serif; font-size: 48px; line-height: 56px; font-weight: 700; }
-.yelp-h2 { font-family: 'Poppins', sans-serif; font-size: 28px; line-height: 36px; font-weight: 700; }
-.yelp-h3 { font-family: 'Poppins', sans-serif; font-size: 24px; line-height: 32px; font-weight: 700; }
-.yelp-h4 { font-family: 'Poppins', sans-serif; font-size: 20px; line-height: 28px; font-weight: 700; }
+.yelp-h1 { font-family: 'Poppins', sans-serif; font-size: 72px; line-height: 84px; font-weight: 700; }
+.yelp-h2 { font-family: 'Poppins', sans-serif; font-size: 42px; line-height: 54px; font-weight: 700; }
+.yelp-h3 { font-family: 'Poppins', sans-serif; font-size: 36px; line-height: 48px; font-weight: 700; }
+.yelp-h4 { font-family: 'Poppins', sans-serif; font-size: 30px; line-height: 42px; font-weight: 700; }
 
 /* Body Display — Poppins */
-.yelp-b1-display-bold { font-family: 'Poppins', sans-serif; font-size: 16px; line-height: 24px; font-weight: 700; }
-.yelp-b1-display-med  { font-family: 'Poppins', sans-serif; font-size: 16px; line-height: 24px; font-weight: 500; }
-.yelp-b2-display-bold { font-family: 'Poppins', sans-serif; font-size: 14px; line-height: 20px; font-weight: 700; }
-.yelp-b2-display-med  { font-family: 'Poppins', sans-serif; font-size: 14px; line-height: 20px; font-weight: 500; }
+.yelp-b1-display-bold { font-family: 'Poppins', sans-serif; font-size: 24px; line-height: 36px; font-weight: 700; }
+.yelp-b1-display-med  { font-family: 'Poppins', sans-serif; font-size: 24px; line-height: 36px; font-weight: 500; }
+.yelp-b2-display-bold { font-family: 'Poppins', sans-serif; font-size: 21px; line-height: 30px; font-weight: 700; }
+.yelp-b2-display-med  { font-family: 'Poppins', sans-serif; font-size: 21px; line-height: 30px; font-weight: 500; }
 
 /* Body Text — Open Sans */
-.yelp-b1-bold { font-family: 'Open Sans', sans-serif; font-size: 16px; line-height: 24px; font-weight: 700; }
-.yelp-b1-semi { font-family: 'Open Sans', sans-serif; font-size: 16px; line-height: 24px; font-weight: 600; }
-.yelp-b1      { font-family: 'Open Sans', sans-serif; font-size: 16px; line-height: 24px; font-weight: 400; }
+.yelp-b1-bold { font-family: 'Open Sans', sans-serif; font-size: 24px; line-height: 36px; font-weight: 700; }
+.yelp-b1-semi { font-family: 'Open Sans', sans-serif; font-size: 24px; line-height: 36px; font-weight: 600; }
+.yelp-b1      { font-family: 'Open Sans', sans-serif; font-size: 24px; line-height: 36px; font-weight: 400; }
 
-.yelp-b2-bold { font-family: 'Open Sans', sans-serif; font-size: 14px; line-height: 20px; font-weight: 700; }
-.yelp-b2-semi { font-family: 'Open Sans', sans-serif; font-size: 14px; line-height: 20px; font-weight: 600; }
-.yelp-b2      { font-family: 'Open Sans', sans-serif; font-size: 14px; line-height: 20px; font-weight: 400; }
+.yelp-b2-bold { font-family: 'Open Sans', sans-serif; font-size: 21px; line-height: 30px; font-weight: 700; }
+.yelp-b2-semi { font-family: 'Open Sans', sans-serif; font-size: 21px; line-height: 30px; font-weight: 600; }
+.yelp-b2      { font-family: 'Open Sans', sans-serif; font-size: 21px; line-height: 30px; font-weight: 400; }
 
-.yelp-b3-bold { font-family: 'Open Sans', sans-serif; font-size: 12px; line-height: 16px; font-weight: 700; }
-.yelp-b3-semi { font-family: 'Open Sans', sans-serif; font-size: 12px; line-height: 16px; font-weight: 600; }
-.yelp-b3      { font-family: 'Open Sans', sans-serif; font-size: 12px; line-height: 16px; font-weight: 400; }
+.yelp-b3-bold { font-family: 'Open Sans', sans-serif; font-size: 18px; line-height: 24px; font-weight: 700; }
+.yelp-b3-semi { font-family: 'Open Sans', sans-serif; font-size: 18px; line-height: 24px; font-weight: 600; }
+.yelp-b3      { font-family: 'Open Sans', sans-serif; font-size: 18px; line-height: 24px; font-weight: 400; }
 
-.yelp-b4-bold { font-family: 'Open Sans', sans-serif; font-size: 10px; line-height: 12px; font-weight: 700; }
-.yelp-b4-semi { font-family: 'Open Sans', sans-serif; font-size: 10px; line-height: 12px; font-weight: 600; }
-.yelp-b4      { font-family: 'Open Sans', sans-serif; font-size: 10px; line-height: 12px; font-weight: 400; }
+.yelp-b4-bold { font-family: 'Open Sans', sans-serif; font-size: 15px; line-height: 18px; font-weight: 700; }
+.yelp-b4-semi { font-family: 'Open Sans', sans-serif; font-size: 15px; line-height: 18px; font-weight: 600; }
+.yelp-b4      { font-family: 'Open Sans', sans-serif; font-size: 15px; line-height: 18px; font-weight: 400; }
 
 /* ── Global base styles ───────────────────────────────────────────────────── */
 body {
   font-family: 'Open Sans', sans-serif;
-  font-size: 16px;
-  line-height: 24px;
+  font-size: 24px;
+  line-height: 36px;
   color: #1a1a1a;
 }

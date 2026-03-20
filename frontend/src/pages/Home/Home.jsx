@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '../../context/AuthContext'
-import yelpLogoDark from '../../assets/yelp_logo_dark_bg.svg'
+import { useNavigate } from 'react-router-dom'
+import PageHeader from '../../components/layout/PageHeader'
+import Footer from '../../components/layout/Footer'
 
 // ── Slide data ───────────────────────────────────────────────────────────────
 const SLIDES = [
@@ -11,8 +11,7 @@ const SLIDES = [
   { text: 'Keep your car feeling fresh',  searchText: 'Auto detailing', bg: 'https://images.unsplash.com/photo-1607860108855-64acf2078ed9?w=1600&q=80&auto=format&fit=crop', photoTitle: 'Keep your car feeling fresh',  author: 'Unsplash' },
 ]
 
-const NAV_CATEGORIES = ['Restaurants', 'Home & Garden', 'Auto Services', 'Health & Beauty', 'Travel & Activities', 'More']
-const SLIDE_DURATION  = 5000
+const SLIDE_DURATION = 5000
 
 // ── Review cards ─────────────────────────────────────────────────────────────
 const ALL_REVIEWS = [
@@ -92,29 +91,6 @@ const RECENT_BUSINESSES_MORE = [
   'Ink & Iron',       'Fishing With Dynamite', 'Destroyer',     'Providence',
 ]
 
-// ── Footer data ───────────────────────────────────────────────────────────────
-const FOOTER_COLUMNS = [
-  {
-    title: 'About',
-    links: ['About Yelp', 'Careers', 'Press', 'Investor Relations', 'Trust & Safety', 'Content Guidelines', 'Accessibility Statement', 'Terms of Service', 'Privacy Policy', 'Ad Choices', 'Your Privacy Choices'],
-  },
-  {
-    title: 'Discover',
-    links: ['Yelp Project Cost Guides', 'Collections', 'Talk', 'Events', 'The Local Yelp', 'Official Yelp Blog', 'Support', 'Yelp Mobile'],
-  },
-  {
-    title: 'Yelp for Business',
-    links: ['Claim your Business Page', 'Advertise on Yelp', 'Yelp for Restaurant Owners', 'Table Management', 'Business Success Stories', 'Business Support', 'Yelp Blog for Business'],
-  },
-  {
-    title: 'RepairPal',
-    links: ['RepairPal', 'Car Makes', 'Car Repair Estimates'],
-  },
-  {
-    title: 'Languages',
-    links: ['English', 'العربية', 'Čeština', 'Dansk', 'Deutsch', 'Español (España)', 'Español (Latinoamérica)', 'Suomi', 'Filipino', 'Français', 'Magyar', 'Italiano', '日本語', '한국어', 'Bahasa Melayu', 'Nederlands', 'Norsk', 'Polski', 'Português', 'Română', 'Русский', 'Svenska', '中文 (简体)', '中文 (繁體)', 'Türkçe'],
-  },
-]
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 function StarRating({ rating }) {
@@ -206,13 +182,11 @@ function SearchGrid({ title, initial, more }) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function Home() {
-  const [current, setCurrent]         = useState(0)
-  const [paused, setPaused]           = useState(false)
-  const [search, setSearch]           = useState({ query: '', location: '' })
+  const [current, setCurrent]               = useState(0)
+  const [paused, setPaused]                 = useState(false)
   const [showAllReviews, setShowAllReviews] = useState(false)
   const [selectedCity, setSelectedCity]     = useState('Los Angeles')
-  const { user, logout }              = useAuth()
-  const navigate                      = useNavigate()
+  const navigate                            = useNavigate()
 
   const visibleReviews = showAllReviews ? ALL_REVIEWS : ALL_REVIEWS.slice(0, 12)
   const cityState      = CITY_STATES[selectedCity]
@@ -222,11 +196,6 @@ export default function Home() {
     const timer = setInterval(() => setCurrent((p) => (p + 1) % SLIDES.length), SLIDE_DURATION)
     return () => clearInterval(timer)
   }, [paused])
-
-  const handleSearch = (e) => {
-    e.preventDefault()
-    navigate(`/?query=${search.query}&location=${search.location}`)
-  }
 
   const slide = SLIDES[current]
 
@@ -240,58 +209,8 @@ export default function Home() {
         ))}
 
         <div className="relative z-10 flex flex-col h-full text-white">
-          {/* Header strip */}
-          <div className="flex items-start px-6 pt-6 pb-14 gap-6"
-            style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.6), transparent)' }}>
-
-            <Link to="/" className="shrink-0 pt-1 w-24">
-              <img src={yelpLogoDark} alt="Yelp" className="h-8 w-auto" />
-            </Link>
-
-            <div className="flex-1 flex flex-col gap-3">
-              <div className="flex items-center gap-5">
-                <form onSubmit={handleSearch} className="flex flex-1 max-w-3xl bg-white rounded-lg overflow-hidden shadow-lg">
-                  <input type="text" value={search.query} onChange={(e) => setSearch({ ...search, query: e.target.value })}
-                    placeholder="things to do, nail salons, plumbers"
-                    className="flex-1 px-4 py-2.5 yelp-b1 text-gray-700 focus:outline-none min-w-0" />
-                  <div className="w-px bg-gray-300 my-2 shrink-0" />
-                  <input type="text" value={search.location} onChange={(e) => setSearch({ ...search, location: e.target.value })}
-                    placeholder="address, neighborhood, city, state, or zip"
-                    className="flex-1 px-4 py-2.5 yelp-b1 text-gray-700 focus:outline-none min-w-0" />
-                  <button type="submit" className="bg-[#d32323] text-white px-4 flex items-center justify-center hover:bg-red-700 shrink-0">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
-                    </svg>
-                  </button>
-                </form>
-
-                <div className="ml-auto flex items-center gap-5 shrink-0">
-                  <button className="yelp-b2 text-white flex items-center gap-1 hover:underline whitespace-nowrap">Yelp for Business <span className="text-xs">▾</span></button>
-                  <button className="yelp-b2 text-white hover:underline whitespace-nowrap">Write a Review</button>
-                  <button className="yelp-b2 text-white hover:underline whitespace-nowrap">Start a Project</button>
-                  {user ? (
-                    <>
-                      <Link to="/profile" className="yelp-b2 text-white hover:underline">Profile</Link>
-                      <button onClick={() => logout()} className="yelp-b2 text-white bg-white/15 px-4 py-1.5 rounded hover:bg-white/25 whitespace-nowrap">Log Out</button>
-                    </>
-                  ) : (
-                    <>
-                      <Link to="/login" className="yelp-b2 text-white bg-white/15 px-4 py-1.5 rounded hover:bg-white/25 whitespace-nowrap">Log In</Link>
-                      <Link to="/signup" className="yelp-b2 text-white bg-[#d32323] px-4 py-1.5 rounded hover:bg-red-700 whitespace-nowrap">Sign Up</Link>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-6">
-                {NAV_CATEGORIES.map((cat) => (
-                  <button key={cat} className="yelp-b2 text-white flex items-center gap-1 hover:underline whitespace-nowrap">
-                    {cat} <span className="text-xs">▾</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
+          {/* Shared header — dark variant (gradient over photo) */}
+          <PageHeader variant="dark" />
 
           {/* Slide card */}
           <div className="flex-1 flex items-center px-6">
@@ -311,7 +230,7 @@ export default function Home() {
               </div>
               <div>
                 <h1 className="yelp-h1 text-white drop-shadow-lg mb-6">{slide.text}</h1>
-                <button onClick={() => setSearch({ ...search, query: slide.searchText })}
+                <button onClick={() => navigate(`/?query=${encodeURIComponent(slide.searchText)}`)}
                   className="flex items-center gap-2 bg-[#d32323] text-white px-5 py-2.5 rounded yelp-b1-display-bold hover:bg-red-700 shadow-lg">
                   <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
@@ -418,25 +337,7 @@ export default function Home() {
         />
       </div>
 
-      {/* ── FOOTER ───────────────────────────────────────────────────────────── */}
-      <footer className="bg-gray-100 px-36 py-12">
-        <div className="grid grid-cols-5 gap-8">
-          {FOOTER_COLUMNS.map((col) => (
-            <div key={col.title}>
-              <p className="yelp-b1-bold text-gray-900 mb-3">{col.title}</p>
-              <ul className="flex flex-col gap-1.5">
-                {col.links.map((link) => (
-                  <li key={link}>
-                    <a href="#" className="yelp-b2 text-gray-500 hover:text-gray-800 hover:underline">
-                      {link}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </footer>
+      <Footer />
     </div>
   )
 }
