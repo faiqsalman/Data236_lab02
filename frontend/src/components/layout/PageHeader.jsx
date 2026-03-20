@@ -12,7 +12,8 @@ const NAV_CATEGORIES = [
 // variant="dark"       → gradient bg, white text  (used on Home hero)
 // variant="light"      → white bg, dark text      (used on all other pages)
 // showProfileNav=true  → replaces auth buttons with bell + avatar (used on Profile page)
-export default function PageHeader({ variant = 'light', showProfileNav = false }) {
+// compact=true         → hides the category dropdowns row (used when header is sticky + scrolled)
+export default function PageHeader({ variant = 'light', showProfileNav = false, compact = false }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [search, setSearch] = useState({ query: '', location: '' })
@@ -21,7 +22,7 @@ export default function PageHeader({ variant = 'light', showProfileNav = false }
 
   const handleSearch = (e) => {
     e.preventDefault()
-    navigate(`/?query=${encodeURIComponent(search.query)}&location=${encodeURIComponent(search.location)}`)
+    navigate(`/search?query=${encodeURIComponent(search.query)}&location=${encodeURIComponent(search.location)}`)
   }
 
   const textCls    = dark ? 'text-white'   : 'text-gray-700'
@@ -30,12 +31,12 @@ export default function PageHeader({ variant = 'light', showProfileNav = false }
 
   return (
     <div
-      className={`flex items-start gap-6 px-6 pt-6 ${dark ? 'pb-14' : 'pb-4 bg-white border-b border-gray-200 shadow-sm'}`}
+      className={`flex items-start gap-8 px-14 pt-8 ${dark ? 'pb-14' : 'pb-6 bg-white border-b border-gray-200 shadow-sm'}`}
       style={dark ? { background: 'linear-gradient(to bottom, rgba(0,0,0,0.6), transparent)' } : {}}
     >
       {/* Logo — fixed-width column so content aligns with search bar */}
-      <Link to="/" className="shrink-0 pt-1 w-24">
-        <img src={dark ? yelpLogoDark : yelpLogoLight} alt="Yelp" className="h-8 w-auto" />
+      <Link to="/" className="shrink-0 pt-1 w-36">
+        <img src={dark ? yelpLogoDark : yelpLogoLight} alt="Yelp" className="h-12 w-auto" />
       </Link>
 
       {/* Right column: search bar + categories + nav links */}
@@ -124,17 +125,19 @@ export default function PageHeader({ variant = 'light', showProfileNav = false }
           </div>
         </div>
 
-        {/* Row 2: category dropdowns */}
-        <div className="flex items-center gap-6">
-          {NAV_CATEGORIES.map((cat) => (
-            <button
-              key={cat}
-              className={`yelp-b2 flex items-center gap-1 hover:underline whitespace-nowrap ${textCls}`}
-            >
-              {cat} <span className="text-xs">▾</span>
-            </button>
-          ))}
-        </div>
+        {/* Row 2: category dropdowns — hidden when compact (sticky + scrolled) */}
+        {!compact && (
+          <div className="flex items-center gap-6">
+            {NAV_CATEGORIES.map((cat) => (
+              <button
+                key={cat}
+                className={`yelp-b2 flex items-center gap-1 hover:underline whitespace-nowrap ${textCls}`}
+              >
+                {cat} <span className="text-xs">▾</span>
+              </button>
+            ))}
+          </div>
+        )}
 
       </div>
     </div>

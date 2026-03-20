@@ -9,6 +9,7 @@ import Login from './pages/Auth/Login'
 import Signup from './pages/Auth/Signup'
 import RestaurantDetails from './pages/Restaurant/RestaurantDetails'
 import AddRestaurant from './pages/Restaurant/AddRestaurant'
+import SearchResults from './pages/Search/SearchResults'
 import Profile from './pages/Profile/Profile'
 import AIAssistant from './pages/AI/AIAssistant'
 
@@ -23,6 +24,7 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/search" element={<SearchResults />} />
             <Route path="/restaurants/:id" element={<RestaurantDetails />} />
 
             {/* Protected */}
