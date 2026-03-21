@@ -1,15 +1,17 @@
+from typing import List, Optional
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.models.restaurant import Restaurant
 
 router = APIRouter()
 
 
 class ChatMessage(BaseModel):
-    role: str   # "user" or "assistant"
+    role: str
     content: str
 
 
@@ -25,11 +27,36 @@ class ChatResponse(BaseModel):
 
 @router.post("/chat", response_model=ChatResponse)
 def chat(payload: ChatRequest, db: Session = Depends(get_db)):
-    # TODO: inject current_user (optional — works without auth too)
-    # TODO: load user preferences from DB (if authenticated)
-    # TODO: use LangChain to interpret payload.message + payload.conversation_history
-    # TODO: extract filters: cuisine, price_range, dietary, occasion, ambiance
-    # TODO: query restaurant DB with extracted filters
-    # TODO: optionally use Tavily for web-search context
-    # TODO: rank and return top recommendations as structured ChatResponse
-    raise NotImplementedError
+    message_lower = payload.message.lower()
+
+    query = db.query(Restaurant)
+
+    if "pizza" in message_lower:
+        query = query.filter(Restaurant.cuisine_type.ilike("%pizza%"))
+    elif "burger" in message_lower:
+        query = query.filter(Restaurant.cuisine_type.ilike("%burger%"))
+    elif "indian" in message_lower:
+        query = query.filter(Restaurant.cuisine_type.ilike("%indian%"))
+    elif "chinese" in message_lower:
+        query = query.filter(Restaurant.cuisine_type.ilike("%chinese%"))
+    elif "italian" in message_lower:
+        query = query.filter(Restaurant.cuisine_type.ilike("%italian%"))
+    elif "mexican" in message_lower:
+        query = query.filter(Restaurant.cuisine_type.ilike("%mexican%"))
+
+    recommendations = query.order_by(Restaurant.avg_rating.desc()).limit(5).all()
+
+    return ChatResponse(
+        reply="Here are some restaurant suggestions based on your message. Later you can replace this with real AI + LangChain logic.",
+        recommendations=[
+            {
+                "id": r.id,
+                "name": r.name,
+                "cuisine_type": r.cuisine_type,
+                "city": r.city,
+                "avg_rating": r.avg_rating,
+                "pricing_tier": r.pricing_tier,
+            }
+            for r in recommendations
+        ],
+    )

@@ -12,11 +12,11 @@ class Restaurant(Base):
     city = Column(String(100), index=True)
     zip_code = Column(String(20))
     description = Column(Text)
-    hours = Column(String(500))             # JSON string or free text
+    hours = Column(String(500))
     contact_phone = Column(String(20))
     contact_email = Column(String(255))
-    pricing_tier = Column(String(10))       # "$", "$$", "$$$", "$$$$"
-    amenities = Column(String(500))         # comma-separated keywords
+    pricing_tier = Column(String(10))
+    amenities = Column(String(500))
     avg_rating = Column(Float, default=0.0)
     review_count = Column(Integer, default=0)
     added_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
