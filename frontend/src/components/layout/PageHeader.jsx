@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { useAuthModal } from '../../context/AuthModalContext'
 import yelpLogoDark from '../../assets/yelp_logo_dark_bg.svg'
 import yelpLogoLight from '../../assets/yelp_logo.svg'
 
@@ -15,6 +16,7 @@ const NAV_CATEGORIES = [
 // compact=true         → hides the category dropdowns row (used when header is sticky + scrolled)
 export default function PageHeader({ variant = 'light', showProfileNav = false, compact = false }) {
   const { user, logout } = useAuth()
+  const { openLogin, openSignup } = useAuthModal()
   const navigate = useNavigate()
   const [search, setSearch] = useState({ query: '', location: '' })
 
@@ -79,7 +81,7 @@ export default function PageHeader({ variant = 'light', showProfileNav = false, 
             <button className={`yelp-b2 flex items-center gap-1 hover:underline whitespace-nowrap ${textCls}`}>
               Yelp for Business <span className="text-xs">▾</span>
             </button>
-            <button className={`yelp-b2 hover:underline whitespace-nowrap ${textCls}`}>Write a Review</button>
+            <button onClick={() => navigate('/search')} className={`yelp-b2 hover:underline whitespace-nowrap ${textCls}`}>Write a Review</button>
             <button className={`yelp-b2 hover:underline whitespace-nowrap ${textCls}`}>Start a Project</button>
 
             {showProfileNav ? (
@@ -111,15 +113,15 @@ export default function PageHeader({ variant = 'light', showProfileNav = false, 
               </>
             ) : (
               <>
-                <Link to="/login" className={`yelp-b2 px-4 py-1.5 rounded whitespace-nowrap ${loginCls}`}>
+                <button onClick={openLogin} className={`yelp-b2 px-4 py-1.5 rounded whitespace-nowrap ${loginCls}`}>
                   Log In
-                </Link>
-                <Link
-                  to="/signup"
+                </button>
+                <button
+                  onClick={openSignup}
                   className="yelp-b2 text-white bg-[#d32323] px-4 py-1.5 rounded hover:bg-red-700 whitespace-nowrap"
                 >
                   Sign Up
-                </Link>
+                </button>
               </>
             )}
           </div>

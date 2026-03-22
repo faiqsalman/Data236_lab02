@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import PageHeader from '../../components/layout/PageHeader'
 import Footer from '../../components/layout/Footer'
+import { getRestaurants } from '../../services/restaurantService'
+import { sendMessage as sendAIMessage } from '../../services/aiService'
 
 /* ─── Mock AI responses ───────────────────────────────────────────── */
 const SUGGESTED_PROMPTS = [
@@ -49,11 +51,22 @@ function AIAssistantPanel({ query, location }) {
     setMessages((m) => [...m, userMsg])
     setInput('')
     setLoading(true)
-    // Simulate API delay — replace with real API call when backend is ready
-    setTimeout(() => {
-      setMessages((m) => [...m, { role: 'assistant', text: getAIResponse(text) }])
-      setLoading(false)
-    }, 900)
+    const history = messages.map((m) => ({ role: m.role, content: m.text }))
+    sendAIMessage(text, history)
+      .then((res) => {
+        const { reply, recommendations } = res.data
+        let full = reply
+        if (recommendations?.length) {
+          full += '\n\n' + recommendations.map((r, i) =>
+            `**${i + 1}. ${r.name}** (${r.cuisine_type || ''}) — ${r.city || ''} · ${r.pricing_tier || ''} · ⭐ ${r.avg_rating?.toFixed(1) ?? 'N/A'}`
+          ).join('\n')
+        }
+        setMessages((m) => [...m, { role: 'assistant', text: full }])
+      })
+      .catch(() => {
+        setMessages((m) => [...m, { role: 'assistant', text: getAIResponse(text) }])
+      })
+      .finally(() => setLoading(false))
   }
 
   const handleSubmit = (e) => {
@@ -314,8 +327,19 @@ export default function SearchResults() {
   const [searchAsMapMoves, setSearchAsMapMoves] = useState(true)
   const [currentPage, setCurrentPage]         = useState(1)
   const [showAssistant, setShowAssistant]     = useState(false)
+  const [restaurants, setRestaurants]         = useState(MOCK_RESTAURANTS)
+  const [loadingResults, setLoadingResults]   = useState(true)
 
   const allFiltersRef = useRef(null)
+
+  useEffect(() => {
+    setLoadingResults(true)
+    const city = location.split(',')[0]?.trim()
+    getRestaurants({ q: query !== 'Restaurants' ? query : undefined, city })
+      .then((res) => setRestaurants(res.data))
+      .catch(() => {})
+      .finally(() => setLoadingResults(false))
+  }, [query, location])
 
   // Collapse category row on scroll
   useEffect(() => {
@@ -482,12 +506,31 @@ export default function SearchResults() {
           </p>
 
           {/* Restaurant tiles */}
-          {MOCK_RESTAURANTS.map((r) => <RestaurantTile key={r.id} restaurant={r} />)}
+          {loadingResults ? (
+            <div className="py-16 text-center yelp-b2 text-gray-400">Loading restaurants…</div>
+          ) : restaurants.slice((currentPage - 1) * 10, currentPage * 10).map((r, idx) => (
+            <RestaurantTile key={r.id} restaurant={{
+              id:             r.id,
+              rank:           r.rank ?? idx + 1,
+              name:           r.name,
+              rating:         r.avg_rating   ?? r.rating       ?? 0,
+              reviewCount:    r.review_count ?? r.reviewCount  ?? 0,
+              neighborhood:   r.city         ?? r.neighborhood ?? '',
+              price:          r.pricing_tier ?? r.price        ?? '$',
+              isOpen:         r.isOpen       ?? true,
+              hours:          r.hours        ?? '',
+              reviewSnippet:  r.description  ?? r.reviewSnippet ?? '',
+              tags:           r.tags ?? [r.cuisine_type, ...(r.amenities ? r.amenities.split(',').map(a => a.trim()) : [])].filter(Boolean),
+            }} />
+          ))}
 
           {/* ── Pagination ──────────────────────────────────── */}
+          {(() => {
+            const totalPages = Math.max(1, Math.ceil(restaurants.length / 10))
+            return (
           <div className="flex items-center justify-between mt-8 mb-5">
             <div className="flex items-center gap-1">
-              {[1, 2, 3, 4, 5, 6, 7, 8].map((p) => (
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
                 <button
                   key={p}
                   onClick={() => setCurrentPage(p)}
@@ -498,12 +541,14 @@ export default function SearchResults() {
               ))}
             </div>
             <button
-              onClick={() => setCurrentPage((p) => Math.min(p + 1, 8))}
+              onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
               className="bg-[#d32323] text-white px-10 py-3 rounded-lg yelp-b2-semi hover:bg-red-700"
             >
               Next Page
             </button>
           </div>
+            )
+          })()}
 
           <hr className="my-8 border-gray-200" />
 

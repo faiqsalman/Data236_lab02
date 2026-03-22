@@ -1,14 +1,8 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import yelpLogo from '../../assets/yelp_logo.svg'
-
-// Mock restaurant data — replace with API fetch by :id once backend is ready
-const MOCK_RESTAURANT = {
-  id: 1,
-  name: 'The Golden Fork',
-  category: 'Italian · Downtown · $$',
-  address: '123 Main St, San Francisco, CA 94103',
-}
+import { getRestaurant } from '../../services/restaurantService'
+import { createReview } from '../../services/reviewService'
 
 const RATING_LABELS = ['', 'Eek! Methinks not.', "Meh. I've experienced better.", 'A-OK.', 'Yay! I\'m a fan.', 'Woohoo! As good as it gets!']
 
@@ -40,12 +34,17 @@ export default function WriteReview() {
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
 
-  const restaurant = MOCK_RESTAURANT // TODO: fetch by id
-
+  const [restaurant, setRestaurant] = useState(null)
   const [rating, setRating]         = useState(0)
   const [review, setReview]         = useState('')
   const [photos, setPhotos]         = useState([])
   const [dragging, setDragging]     = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
+
+  useEffect(() => {
+    if (id) getRestaurant(id).then(r => setRestaurant(r.data)).catch(() => {})
+  }, [id])
 
   const MIN_CHARS = 85
   const charsLeft = Math.max(0, MIN_CHARS - review.length)
@@ -64,11 +63,18 @@ export default function WriteReview() {
     handleFiles(e.dataTransfer.files)
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (rating === 0 || !metMin) return
-    // TODO: post to backend
-    navigate(`/restaurants/${id || 1}`)
+    setSubmitting(true)
+    setSubmitError('')
+    try {
+      await createReview(id, { rating, comment: review })
+      navigate(`/restaurants/${id}`)
+    } catch (err) {
+      setSubmitError(err.response?.data?.detail || 'Failed to post review. Please try again.')
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -103,8 +109,8 @@ export default function WriteReview() {
               </svg>
             </div>
             <div>
-              <h1 className="yelp-h4 text-gray-900">{restaurant.name}</h1>
-              <p className="yelp-b3 text-gray-500 mt-0.5">San Francisco, CA</p>
+              <h1 className="yelp-h4 text-gray-900">{restaurant?.name || '…'}</h1>
+              <p className="yelp-b3 text-gray-500 mt-0.5">{[restaurant?.city, restaurant?.state].filter(Boolean).join(', ')}</p>
             </div>
           </div>
 
@@ -207,11 +213,13 @@ export default function WriteReview() {
           </div>
 
           {/* Submit */}
+          {submitError && <p className="yelp-b3 text-red-600 mb-3">{submitError}</p>}
           <button
             type="submit"
-            className="px-10 py-3 rounded-full yelp-b1-bold bg-[#d32323] text-white hover:bg-red-700 transition-colors"
+            disabled={submitting}
+            className="px-10 py-3 rounded-full yelp-b1-bold bg-[#d32323] text-white hover:bg-red-700 transition-colors disabled:opacity-50"
           >
-            Post Review
+            {submitting ? 'Posting…' : 'Post Review'}
           </button>
 
         </form>

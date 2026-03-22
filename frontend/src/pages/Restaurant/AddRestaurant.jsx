@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { createRestaurant } from '../../services/restaurantService'
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import PageHeader from '../../components/layout/PageHeader'
@@ -101,11 +102,27 @@ export default function AddRestaurant() {
     (c) => c.toLowerCase().includes(categoryInput.toLowerCase()) && !form.categories.includes(c)
   )
 
-  const handleSubmit = (e) => {
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
+
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    // TODO: wire to backend
-    alert('Business submitted for review!')
-    navigate('/')
+    setSubmitting(true)
+    setSubmitError('')
+    try {
+      const res = await createRestaurant({
+        name:          form.businessName,
+        address:       [form.address1, form.address2].filter(Boolean).join(', '),
+        city:          form.city,
+        zip_code:      form.zip,
+        contact_phone: form.phone || null,
+        cuisine_type:  form.categories.join(', ') || null,
+      })
+      navigate(`/restaurants/${res.data.id}`)
+    } catch (err) {
+      setSubmitError(err.response?.data?.detail || 'Failed to submit. Please try again.')
+      setSubmitting(false)
+    }
   }
 
   const inputCls = 'w-full border border-gray-500 rounded-lg px-4 py-3 yelp-b2 text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#d32323] focus:ring-1 focus:ring-[#d32323]'
@@ -335,11 +352,13 @@ export default function AddRestaurant() {
           )}
 
           {/* Submit */}
+          {submitError && <p className="yelp-b3 text-red-600 mb-3">{submitError}</p>}
           <button
             type="submit"
-            className="bg-[#d32323] text-white rounded-lg px-8 py-3 yelp-b2-bold hover:bg-red-700 transition-colors"
+            disabled={submitting}
+            className="bg-[#d32323] text-white rounded-lg px-8 py-3 yelp-b2-bold hover:bg-red-700 transition-colors disabled:opacity-50"
           >
-            Add Business
+            {submitting ? 'Submitting…' : 'Add Business'}
           </button>
 
         </form>

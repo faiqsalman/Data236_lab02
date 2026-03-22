@@ -1,7 +1,10 @@
-import { useState, useRef } from 'react'
-import { useParams } from 'react-router-dom'
+import { useState, useRef, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import PageHeader from '../../components/layout/PageHeader'
 import Footer from '../../components/layout/Footer'
+import { getReviews, updateReview, deleteReview } from '../../services/reviewService'
+import { addFavorite, removeFavorite } from '../../services/userService'
+import { useAuth } from '../../context/AuthContext'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mock data  (replaced by API call once backend is wired)
@@ -230,9 +233,9 @@ function ReactionBtn({ type, label, count }) {
   )
 }
 
-function WriteReviewTile({ businessName }) {
+function WriteReviewTile({ businessName, restaurantId }) {
   const [hover, setHover] = useState(0)
-  const [selected, setSelected] = useState(0)
+  const navigate = useNavigate()
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4 mb-6">
       <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center shrink-0">
@@ -242,8 +245,9 @@ function WriteReviewTile({ businessName }) {
         <div className="flex items-center gap-3">
           <div className="flex gap-0.5">
             {[1, 2, 3, 4, 5].map((s) => (
-              <svg key={s} onMouseEnter={() => setHover(s)} onMouseLeave={() => setHover(0)} onClick={() => setSelected(s)}
-                className={`w-7 h-7 cursor-pointer transition-colors ${s <= (hover || selected) ? 'fill-[#d32323]' : 'fill-gray-200'}`} viewBox="0 0 24 24">
+              <svg key={s} onMouseEnter={() => setHover(s)} onMouseLeave={() => setHover(0)}
+                onClick={() => navigate(`/restaurants/${restaurantId}/review`)}
+                className={`w-7 h-7 cursor-pointer transition-colors ${s <= hover ? 'fill-[#d32323]' : 'fill-gray-200'}`} viewBox="0 0 24 24">
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
               </svg>
             ))}
@@ -286,7 +290,38 @@ function RatingBreakdown({ breakdown, total, rating }) {
   )
 }
 
-function ReviewCard({ review }) {
+function ReviewCard({ review, currentUserId, onDelete, onUpdate }) {
+  // Support both mock shape and API shape
+  const userName = review.user ?? 'Yelp User'
+  const userLocation = review.location ?? ''
+  const reviewText = review.text ?? review.comment ?? ''
+  const reviewDate = review.date ?? (review.created_at ? new Date(review.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '')
+  const reviewPhoto = review.photo ?? review.photo_url ?? null
+  const reactions = review.reactions ?? null
+  const isOwner = currentUserId && review.user_id && currentUserId === review.user_id
+
+  const [editing, setEditing] = useState(false)
+  const [editRating, setEditRating] = useState(review.rating)
+  const [editComment, setEditComment] = useState(reviewText)
+  const [saving, setSaving] = useState(false)
+
+  const handleSaveEdit = async () => {
+    setSaving(true)
+    try {
+      const res = await updateReview(review.id, { rating: editRating, comment: editComment })
+      onUpdate?.(review.id, res.data)
+      setEditing(false)
+    } catch { /* ignore */ } finally { setSaving(false) }
+  }
+
+  const handleDelete = async () => {
+    if (!window.confirm('Delete this review?')) return
+    try {
+      await deleteReview(review.id)
+      onDelete?.(review.id)
+    } catch { /* ignore */ }
+  }
+
   return (
     <div className="py-6 border-b border-gray-200">
       <div className="flex items-start gap-3 mb-3">
@@ -294,14 +329,14 @@ function ReviewCard({ review }) {
           <svg className="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
         </div>
         <div>
-          <p className="yelp-b2-semi text-gray-900">{review.user}</p>
-          <p className="yelp-b3 text-gray-500">{review.location}</p>
+          <p className="yelp-b2-semi text-gray-900">{userName}</p>
+          {userLocation && <p className="yelp-b3 text-gray-500">{userLocation}</p>}
         </div>
       </div>
 
       <div className="flex items-center gap-3 mb-2">
         <StarRating rating={review.rating} size="sm" />
-        <span className="yelp-b3 text-gray-500">{review.date}</span>
+        <span className="yelp-b3 text-gray-500">{reviewDate}</span>
       </div>
 
       {review.photoCount > 0 && (
@@ -311,19 +346,48 @@ function ReviewCard({ review }) {
         </div>
       )}
 
-      <p className="yelp-b2 text-gray-700 leading-relaxed mb-3">{review.text}</p>
+      {editing ? (
+        <div className="mb-3">
+          <div className="flex gap-1 mb-2">
+            {[1,2,3,4,5].map((n) => (
+              <button key={n} onClick={() => setEditRating(n)}
+                className={`text-2xl ${n <= editRating ? 'text-[#d32323]' : 'text-gray-300'}`}>★</button>
+            ))}
+          </div>
+          <textarea rows={4} value={editComment} onChange={(e) => setEditComment(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 yelp-b3 text-gray-700 focus:outline-none focus:border-[#d32323] resize-none" />
+          <div className="flex gap-3 mt-2">
+            <button onClick={handleSaveEdit} disabled={saving}
+              className="bg-[#d32323] text-white yelp-b3-semi px-4 py-1.5 rounded-full hover:bg-red-700 disabled:opacity-50">
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            <button onClick={() => setEditing(false)} className="yelp-b3 text-gray-500 hover:underline">Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <p className="yelp-b2 text-gray-700 leading-relaxed mb-3">{reviewText}</p>
+      )}
 
-      {review.photo && (
+      {reviewPhoto && !editing && (
         <div className="w-40 h-32 rounded-lg overflow-hidden mb-3">
-          <img src={review.photo} alt="" className="w-full h-full object-cover" />
+          <img src={reviewPhoto} alt="" className="w-full h-full object-cover" />
         </div>
       )}
 
-      <div className="flex items-center gap-6 mb-3">
-        {[['helpful', 'Helpful', review.reactions.helpful], ['thanks', 'Thanks', review.reactions.thanks], ['love', 'Love this', review.reactions.love], ['ohno', 'Oh no', review.reactions.ohno]].map(([type, label, count]) => (
-          <ReactionBtn key={type} type={type} label={label} count={count} />
-        ))}
-      </div>
+      {reactions && (
+        <div className="flex items-center gap-6 mb-3">
+          {[['helpful', 'Helpful', reactions.helpful], ['thanks', 'Thanks', reactions.thanks], ['love', 'Love this', reactions.love], ['ohno', 'Oh no', reactions.ohno]].map(([type, label, count]) => (
+            <ReactionBtn key={type} type={type} label={label} count={count} />
+          ))}
+        </div>
+      )}
+
+      {isOwner && !editing && (
+        <div className="flex gap-4 mb-2">
+          <button onClick={() => setEditing(true)} className="yelp-b3 text-[#0073bb] hover:underline">Edit</button>
+          <button onClick={handleDelete} className="yelp-b3 text-red-500 hover:underline">Delete</button>
+        </div>
+      )}
 
       {review.ownerResponse && (
         <div className="border-l-2 border-gray-300 pl-4 mt-2">
@@ -339,8 +403,20 @@ function ReviewCard({ review }) {
 // Main component
 // ─────────────────────────────────────────────────────────────────────────────
 export default function RestaurantDetails() {
-  useParams()
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const { user } = useAuth()
   const r = MOCK
+
+  const [reviews, setReviews] = useState(MOCK.reviews)
+
+  useEffect(() => {
+    if (!id) return
+    getReviews(id).then((res) => setReviews(res.data)).catch(() => {})
+  }, [id])
+
+  const handleDeleteReview = (reviewId) => setReviews((prev) => prev.filter((rv) => rv.id !== reviewId))
+  const handleUpdateReview = (reviewId, updated) => setReviews((prev) => prev.map((rv) => rv.id === reviewId ? { ...rv, ...updated } : rv))
 
   // Photo strip
   const [photoIdx,     setPhotoIdx]     = useState(0)
@@ -369,8 +445,8 @@ export default function RestaurantDetails() {
 
   const visibleAmenities = showAllAmenities ? r.amenities : r.amenities.slice(0, 8)
   const REVIEWS_PER_PAGE = 3
-  const totalPages = Math.ceil(r.reviews.length / REVIEWS_PER_PAGE)
-  const visibleReviews = r.reviews.slice((reviewPage - 1) * REVIEWS_PER_PAGE, reviewPage * REVIEWS_PER_PAGE)
+  const totalPages = Math.ceil(reviews.length / REVIEWS_PER_PAGE)
+  const visibleReviews = reviews.slice((reviewPage - 1) * REVIEWS_PER_PAGE, reviewPage * REVIEWS_PER_PAGE)
 
   return (
     <div className="min-h-screen bg-white">
@@ -421,10 +497,10 @@ export default function RestaurantDetails() {
           {/* ── ACTION BUTTONS ─────────────────────────────────────────────── */}
           <div className="py-5 flex items-center gap-3 border-b border-gray-200">
         {[
-          { red: true,  icon: <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>, label: 'Write a review' },
+          { red: true,  icon: <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>, label: 'Write a review', onClick: () => navigate(`/restaurants/${id}/review`) },
           { icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>, label: 'Add photos/videos' },
           { icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>, label: 'Share' },
-          { icon: <svg className={`w-4 h-4 ${saved ? 'fill-[#d32323]' : 'fill-none stroke-current'}`} strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>, label: saved ? 'Saved' : 'Save', onClick: () => setSaved(!saved), active: saved },
+          { icon: <svg className={`w-4 h-4 ${saved ? 'fill-[#d32323]' : 'fill-none stroke-current'}`} strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>, label: saved ? 'Saved' : 'Save', onClick: () => { const next = !saved; setSaved(next); (next ? addFavorite(id) : removeFavorite(id)).catch(() => setSaved(!next)) }, active: saved },
           { icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>, label: 'Follow' },
         ].map(({ red, icon, label, onClick, active }) => (
           <button key={label} onClick={onClick}
@@ -660,7 +736,7 @@ export default function RestaurantDetails() {
           {/* ── RECOMMENDED REVIEWS ────────────────────────────────────────── */}
           <div className="py-8 border-b border-gray-200">
         <SectionHeader left="Recommended Reviews" />
-        <WriteReviewTile businessName={r.name} />
+        <WriteReviewTile businessName={r.name} restaurantId={id} />
         <RatingBreakdown breakdown={r.ratingBreakdown} total={r.reviewCount} rating={r.rating} />
 
         {/* Sort / Filter / Search */}
@@ -683,7 +759,7 @@ export default function RestaurantDetails() {
         </div>
 
         {/* Review list */}
-        <div>{visibleReviews.map((rev) => <ReviewCard key={rev.id} review={rev} />)}</div>
+        <div>{visibleReviews.map((rev) => <ReviewCard key={rev.id} review={rev} currentUserId={user?.id} onDelete={handleDeleteReview} onUpdate={handleUpdateReview} />)}</div>
 
         {/* Pagination */}
         <div className="flex items-center justify-between mt-6">
