@@ -2,7 +2,7 @@ import os
 import shutil
 import uuid
 
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -190,14 +190,59 @@ def get_history(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    reviews = db.query(Review).filter(Review.user_id == current_user.id).all()
+    reviews = (
+        db.query(Review)
+        .filter(Review.user_id == current_user.id)
+        .order_by(Review.created_at.desc())
+        .all()
+    )
+
     restaurants_added = (
         db.query(Restaurant)
         .filter(Restaurant.added_by_user_id == current_user.id)
+        .order_by(Restaurant.created_at.desc())
+        .all()
+    )
+
+    restaurants_owned = (
+        db.query(Restaurant)
+        .filter(Restaurant.owner_user_id == current_user.id)
+        .order_by(Restaurant.created_at.desc())
         .all()
     )
 
     return {
-        "reviews": reviews,
-        "restaurants_added": restaurants_added,
+        "reviews": [
+            {
+                "id": review.id,
+                "restaurant_id": review.restaurant_id,
+                "rating": review.rating,
+                "comment": review.comment,
+                "photo_url": review.photo_url,
+                "created_at": review.created_at,
+            }
+            for review in reviews
+        ],
+        "restaurants_added": [
+            {
+                "id": restaurant.id,
+                "name": restaurant.name,
+                "city": restaurant.city,
+                "cuisine_type": restaurant.cuisine_type,
+                "avg_rating": restaurant.avg_rating,
+                "review_count": restaurant.review_count,
+            }
+            for restaurant in restaurants_added
+        ],
+        "restaurants_owned": [
+            {
+                "id": restaurant.id,
+                "name": restaurant.name,
+                "city": restaurant.city,
+                "cuisine_type": restaurant.cuisine_type,
+                "avg_rating": restaurant.avg_rating,
+                "review_count": restaurant.review_count,
+            }
+            for restaurant in restaurants_owned
+        ],
     }

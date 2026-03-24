@@ -1,45 +1,64 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import { getMe } from '../services/authService'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
-  const [token, setToken] = useState(() => localStorage.getItem('token'))
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!token) {
-      setLoading(false)
-      return
+    const initAuth = async () => {
+      const token = localStorage.getItem('token')
+
+      if (!token) {
+        setLoading(false)
+        return
+      }
+
+      try {
+        const res = await getMe()
+        setUser(res.data)
+      } catch (err) {
+        console.error('Auth restore failed:', err)
+        localStorage.removeItem('token')
+        setUser(null)
+      } finally {
+        setLoading(false)
+      }
     }
 
-    getMe()
-      .then((res) => setUser(res.data))
-      .catch(() => {
-        setToken(null)
-        localStorage.removeItem('token')
-      })
-      .finally(() => setLoading(false))
-  }, [token])
+    initAuth()
+  }, [])
 
-  const login = (userData, jwt) => {
+  const login = (userData, token) => {
+    localStorage.setItem('token', token)
     setUser(userData)
-    setToken(jwt)
-    localStorage.setItem('token', jwt)
   }
 
   const logout = () => {
-    setUser(null)
-    setToken(null)
     localStorage.removeItem('token')
+    setUser(null)
+  }
+
+  const refreshUser = async () => {
+    try {
+      const res = await getMe()
+      setUser(res.data)
+      return res.data
+    } catch (err) {
+      console.error('Failed to refresh user:', err)
+      return null
+    }
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   )
 }
 
-export const useAuth = () => useContext(AuthContext)
+export function useAuth() {
+  return useContext(AuthContext)
+}

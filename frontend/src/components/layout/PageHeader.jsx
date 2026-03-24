@@ -1,147 +1,201 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { useAuthModal } from '../../context/AuthModalContext'
-import yelpLogoDark from '../../assets/yelp_logo_dark_bg.svg'
-import yelpLogoLight from '../../assets/yelp_logo.svg'
+import { useEffect, useRef, useState } from 'react'
+import api from '../../services/api'
 
-const NAV_CATEGORIES = [
-  'Restaurants', 'Home & Garden', 'Auto Services',
-  'Health & Beauty', 'Travel & Activities', 'More',
-]
-
-// variant="dark"       → gradient bg, white text  (used on Home hero)
-// variant="light"      → white bg, dark text      (used on all other pages)
-// showProfileNav=true  → replaces auth buttons with bell + avatar (used on Profile page)
-// compact=true         → hides the category dropdowns row (used when header is sticky + scrolled)
-export default function PageHeader({ variant = 'light', showProfileNav = false, compact = false }) {
+export default function PageHeader() {
   const { user, logout } = useAuth()
-  const { openLogin, openSignup } = useAuthModal()
   const navigate = useNavigate()
-  const [search, setSearch] = useState({ query: '', location: '' })
+  const location = useLocation()
 
-  const dark = variant === 'dark'
+  const isHeroPage = location.pathname === '/'
+  const isActive = (path) => location.pathname === path
 
-  const handleSearch = (e) => {
-    e.preventDefault()
-    navigate(`/search?query=${encodeURIComponent(search.query)}&location=${encodeURIComponent(search.location)}`)
+  const [search, setSearch] = useState('')
+  const [suggestions, setSuggestions] = useState([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+
+  const searchRef = useRef(null)
+
+  const handleLogout = () => {
+    logout()
+    navigate('/')
   }
 
-  const textCls    = dark ? 'text-white'   : 'text-gray-700'
-  const loginCls   = dark ? 'bg-white/15 text-white hover:bg-white/25'
-                          : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+  const handleSearchSubmit = (e) => {
+    e.preventDefault()
+    const q = search.trim()
+    if (!q) return
+    setShowSuggestions(false)
+    navigate(`/search?q=${encodeURIComponent(q)}`)
+  }
+
+  // 🔍 Suggestions
+  useEffect(() => {
+    const query = search.trim()
+
+    if (!query || !isHeroPage) {
+      setSuggestions([])
+      return
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await api.get('/restaurants', {
+          params: { q: query },
+        })
+
+        const data = Array.isArray(res.data) ? res.data : []
+        setSuggestions(data.slice(0, 5))
+        setShowSuggestions(true)
+      } catch {
+        setSuggestions([])
+      }
+    }, 250)
+
+    return () => clearTimeout(timer)
+  }, [search, isHeroPage])
+
+  // close dropdown
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) {
+        setShowSuggestions(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  const headerClass = isHeroPage
+    ? 'absolute top-0 left-0 w-full z-40 bg-transparent'
+    : 'relative w-full z-40 bg-white border-b border-gray-200 shadow-sm'
+
+  const navClass = isHeroPage ? 'text-white' : 'text-gray-700'
+
+  const logoClass = isHeroPage ? 'text-white' : 'text-[#d32323]'
+
+  const loginClass = isHeroPage
+    ? 'px-3 py-2 rounded-lg border border-white/30 text-white hover:bg-white/10 transition text-sm'
+    : 'px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition text-sm'
+
+  const logoutClass = isHeroPage
+    ? 'px-3 py-2 rounded-lg font-semibold transition bg-white/10 hover:bg-white/20 text-white border border-white/20 text-sm'
+    : 'px-3 py-2 rounded-lg font-semibold transition bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm'
 
   return (
-    <div
-      className={`flex items-start gap-8 px-14 pt-8 ${dark ? 'pb-14' : 'pb-6 bg-white border-b border-gray-200 shadow-sm'}`}
-      style={dark ? { background: 'linear-gradient(to bottom, rgba(0,0,0,0.6), transparent)' } : {}}
-    >
-      {/* Logo — fixed-width column so content aligns with search bar */}
-      <Link to="/" className="shrink-0 pt-1 w-36">
-        <img src={dark ? yelpLogoDark : yelpLogoLight} alt="Yelp" className="h-12 w-auto" />
-      </Link>
+    <header className={headerClass}>
+      <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4">
 
-      {/* Right column: search bar + categories + nav links */}
-      <div className="flex-1 flex flex-col gap-3">
-
-        {/* Row 1: search form + right nav */}
-        <div className="flex items-center gap-5">
-          <form
-            onSubmit={handleSearch}
-            className="flex flex-1 max-w-[900px] bg-white rounded-lg overflow-hidden shadow border border-gray-200"
+          {/* 🔥 YelpClone Logo */}
+          <Link
+            to="/"
+            className={`text-xl font-bold tracking-tight ${logoClass}`}
           >
-            <input
-              type="text"
-              value={search.query}
-              onChange={(e) => setSearch({ ...search, query: e.target.value })}
-              placeholder="things to do, nail salons, plumbers"
-              className="flex-1 px-4 py-2.5 yelp-b1 text-gray-700 focus:outline-none min-w-0"
-            />
-            <div className="w-px bg-gray-300 my-2 shrink-0" />
-            <input
-              type="text"
-              value={search.location}
-              onChange={(e) => setSearch({ ...search, location: e.target.value })}
-              placeholder="address, neighborhood, city, state, or zip"
-              className="flex-1 px-4 py-2.5 yelp-b1 text-gray-700 focus:outline-none min-w-0"
-            />
-            <button
-              type="submit"
-              className="bg-[#d32323] text-white px-4 flex items-center justify-center hover:bg-red-700 shrink-0"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
-                  d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
-              </svg>
-            </button>
-          </form>
+            Yelp
+          </Link>
 
-          {/* Right nav links */}
-          <div className="ml-auto flex items-center gap-5 shrink-0">
-            <button className={`yelp-b2 flex items-center gap-1 hover:underline whitespace-nowrap ${textCls}`}>
-              Yelp for Business <span className="text-xs">▾</span>
-            </button>
-            <button onClick={() => navigate('/search')} className={`yelp-b2 hover:underline whitespace-nowrap ${textCls}`}>Write a Review</button>
-            <button className={`yelp-b2 hover:underline whitespace-nowrap ${textCls}`}>Start a Project</button>
-
-            {showProfileNav ? (
-              /* Profile page: bell + avatar */
-              <div className="flex items-center gap-4">
-                <button className={`hover:opacity-70 ${textCls}`} title="Notifications">
-                  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                  </svg>
-                </button>
-                <Link to="/profile">
-                  <div className="w-10 h-10 rounded-full bg-gray-300 border-2 border-gray-400 flex items-center justify-center overflow-hidden hover:opacity-80">
-                    <svg className="w-6 h-6 text-gray-500" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
-                    </svg>
-                  </div>
-                </Link>
-              </div>
-            ) : user ? (
-              <>
-                <Link to="/profile" className={`yelp-b2 hover:underline ${textCls}`}>Profile</Link>
-                <button
-                  onClick={() => logout()}
-                  className={`yelp-b2 px-4 py-1.5 rounded whitespace-nowrap ${loginCls}`}
-                >
-                  Log Out
-                </button>
-              </>
-            ) : (
-              <>
-                <button onClick={openLogin} className={`yelp-b2 px-4 py-1.5 rounded whitespace-nowrap ${loginCls}`}>
-                  Log In
-                </button>
-                <button
-                  onClick={openSignup}
-                  className="yelp-b2 text-white bg-[#d32323] px-4 py-1.5 rounded hover:bg-red-700 whitespace-nowrap"
-                >
-                  Sign Up
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Row 2: category dropdowns — hidden when compact (sticky + scrolled) */}
-        {!compact && (
-          <div className="flex items-center gap-6">
-            {NAV_CATEGORIES.map((cat) => (
-              <button
-                key={cat}
-                className={`yelp-b2 flex items-center gap-1 hover:underline whitespace-nowrap ${textCls}`}
+          {/* 🔍 Search */}
+          {isHeroPage ? (
+            <div ref={searchRef} className="relative max-w-md w-full mx-auto">
+              <form
+                onSubmit={handleSearchSubmit}
+                className="flex items-center bg-white rounded-xl overflow-hidden shadow-md"
               >
-                {cat} <span className="text-xs">▾</span>
-              </button>
-            ))}
-          </div>
-        )}
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search for pizza, burgers..."
+                  className="flex-1 px-4 py-3 text-gray-900 outline-none text-sm"
+                />
 
+                <button
+                  type="submit"
+                  className="bg-[#d32323] hover:bg-red-700 text-white px-4 py-3 flex items-center justify-center"
+                >
+                  🔍
+                </button>
+              </form>
+
+              {/* Dropdown */}
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="absolute w-full bg-white rounded-xl shadow-lg mt-2 border z-50 overflow-hidden">
+                  {suggestions.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        setShowSuggestions(false)
+                        navigate(`/restaurants/${item.id}`)
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-gray-100 border-b last:border-none"
+                    >
+                      <div className="font-medium text-gray-900">
+                        {item.name}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {item.cuisine_type}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div />
+          )}
+
+          {/* Nav + Auth */}
+          <div className="flex items-center gap-4 justify-self-end">
+            <nav className={`flex items-center gap-4 text-sm ${navClass}`}>
+              <Link to="/" className={isActive('/') ? 'text-[#d32323]' : ''}>
+                Home
+              </Link>
+
+              <Link to="/search" className={isActive('/search') ? 'text-[#d32323]' : ''}>
+                Search
+              </Link>
+
+              {user && <Link to="/add-restaurant">Add Restaurant</Link>}
+              {user && <Link to="/profile">Profile</Link>}
+            </nav>
+
+            <div className="flex items-center gap-2">
+              {user ? (
+                <>
+                  <span
+                    className={`hidden lg:block text-xs ${
+                      isHeroPage ? 'text-white/70' : 'text-gray-500'
+                    }`}
+                  >
+                    Hi, {user.name}
+                  </span>
+
+                  <button onClick={handleLogout} className={logoutClass}>
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link to="/login" className={loginClass}>
+                    Log In
+                  </Link>
+
+                  <Link
+                    to="/signup"
+                    className="px-3 py-2 rounded-lg bg-[#d32323] text-white font-semibold hover:bg-red-700 transition text-sm"
+                  >
+                    Sign Up
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
+
+        </div>
       </div>
-    </div>
+    </header>
   )
 }

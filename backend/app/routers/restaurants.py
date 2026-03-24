@@ -1,7 +1,7 @@
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, Query, HTTPException
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -47,12 +47,15 @@ def search_restaurants(
     query = db.query(Restaurant)
 
     if q:
-        search_term = f"%{q}%"
+        search_term = f"%{q.strip()}%"
         query = query.filter(
-            (Restaurant.name.ilike(search_term))
-            | (Restaurant.description.ilike(search_term))
-            | (Restaurant.address.ilike(search_term))
-            | (Restaurant.city.ilike(search_term))
+            or_(
+                Restaurant.name.ilike(search_term),
+                Restaurant.description.ilike(search_term),
+                Restaurant.address.ilike(search_term),
+                Restaurant.city.ilike(search_term),
+                Restaurant.cuisine_type.ilike(search_term),
+            )
         )
 
     if city:
@@ -80,6 +83,7 @@ def create_restaurant(
     restaurant = Restaurant(
         **payload.model_dump(),
         added_by_user_id=current_user.id,
+        owner_user_id=current_user.id,
     )
     db.add(restaurant)
     db.commit()
@@ -106,13 +110,34 @@ def update_restaurant(
     if not restaurant:
         raise HTTPException(status_code=404, detail="Restaurant not found")
 
-    if restaurant.added_by_user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="You can only update your own restaurant")
+    if restaurant.owner_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only update a restaurant you own")
 
     data = payload.model_dump(exclude_unset=True)
     for key, value in data.items():
         setattr(restaurant, key, value)
 
+    db.commit()
+    db.refresh(restaurant)
+    return restaurant
+
+
+@router.post("/{restaurant_id}/claim", response_model=RestaurantOut)
+def claim_restaurant(
+    restaurant_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+
+    if restaurant.owner_user_id is not None:
+        if restaurant.owner_user_id == current_user.id:
+            return restaurant
+        raise HTTPException(status_code=400, detail="This restaurant already has an owner")
+
+    restaurant.owner_user_id = current_user.id
     db.commit()
     db.refresh(restaurant)
     return restaurant
@@ -124,13 +149,30 @@ def get_reviews(restaurant_id: int, db: Session = Depends(get_db)):
     if not restaurant:
         raise HTTPException(status_code=404, detail="Restaurant not found")
 
-    reviews = (
-        db.query(Review)
+    rows = (
+        db.query(Review, User.name)
+        .join(User, User.id == Review.user_id)
         .filter(Review.restaurant_id == restaurant_id)
         .order_by(Review.created_at.desc())
         .all()
     )
-    return reviews
+
+    results = []
+    for review, user_name in rows:
+        results.append(
+            ReviewOut(
+                id=review.id,
+                user_id=review.user_id,
+                restaurant_id=review.restaurant_id,
+                rating=review.rating,
+                comment=review.comment,
+                photo_url=review.photo_url,
+                created_at=review.created_at,
+                user_name=user_name,
+            )
+        )
+
+    return results
 
 
 @router.post("/{restaurant_id}/reviews", response_model=ReviewOut, status_code=201)
@@ -156,4 +198,13 @@ def create_review(
 
     recalculate_restaurant_rating(db, restaurant_id)
 
-    return review
+    return ReviewOut(
+        id=review.id,
+        user_id=review.user_id,
+        restaurant_id=restaurant_id,
+        rating=review.rating,
+        comment=review.comment,
+        photo_url=review.photo_url,
+        created_at=review.created_at,
+        user_name=current_user.name,
+    )

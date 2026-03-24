@@ -21,5 +21,6 @@ class ReviewOut(BaseModel):
     comment: Optional[str]
     photo_url: Optional[str]
     created_at: datetime
+    user_name: Optional[str] = None
 
     model_config = {"from_attributes": True}

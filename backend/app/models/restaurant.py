@@ -19,6 +19,9 @@ class Restaurant(Base):
     amenities = Column(String(500))
     avg_rating = Column(Float, default=0.0)
     review_count = Column(Integer, default=0)
+
     added_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    owner_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

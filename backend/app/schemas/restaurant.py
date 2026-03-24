@@ -37,6 +37,7 @@ class RestaurantOut(BaseModel):
     avg_rating: float
     review_count: int
     added_by_user_id: Optional[int]
+    owner_user_id: Optional[int]
     created_at: datetime
 
     model_config = {"from_attributes": True}
