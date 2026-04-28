@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: yelp
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: yelp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: 471112632856.dkr.ecr.us-east-1.amazonaws.com/yelp-frontend:latest
+          ports:
+            - containerPort: 5173
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: yelp
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 5173
+      nodePort: 30080
+  type: NodePort

@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: yelp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: YOUR_IMAGE_REGISTRY/yelp-backend:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: MONGODB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: yelp-secret
+                  key: MONGODB_URL
+            - name: MONGODB_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: yelp-config
+                  key: MONGODB_DB
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: yelp-secret
+                  key: SECRET_KEY
+            - name: ALGORITHM
+              valueFrom:
+                configMapKeyRef:
+                  name: yelp-config
+                  key: ALGORITHM
+            - name: ACCESS_TOKEN_EXPIRE_MINUTES
+              valueFrom:
+                configMapKeyRef:
+                  name: yelp-config
+                  key: ACCESS_TOKEN_EXPIRE_MINUTES
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: yelp-config
+                  key: KAFKA_BOOTSTRAP_SERVERS
+            - name: KAFKA_REVIEW_CREATED_TOPIC
+              valueFrom:
+                configMapKeyRef:
+                  name: yelp-config
+                  key: KAFKA_REVIEW_CREATED_TOPIC
+            - name: KAFKA_REVIEW_UPDATED_TOPIC
+              valueFrom:
+                configMapKeyRef:
+                  name: yelp-config
+                  key: KAFKA_REVIEW_UPDATED_TOPIC
+            - name: KAFKA_REVIEW_DELETED_TOPIC
+              valueFrom:
+                configMapKeyRef:
+                  name: yelp-config
+                  key: KAFKA_REVIEW_DELETED_TOPIC
+            - name: OLLAMA_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: yelp-config
+                  key: OLLAMA_HOST
+            - name: OLLAMA_MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: yelp-config
+                  key: OLLAMA_MODEL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: yelp
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 8000
+      targetPort: 8000
+  type: ClusterIP

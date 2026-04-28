@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: review-worker
+  namespace: yelp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: review-worker
+  template:
+    metadata:
+      labels:
+        app: review-worker
+    spec:
+      containers:
+        - name: review-worker
+          image: YOUR_IMAGE_REGISTRY/yelp-review-worker:latest
+          env:
+            - name: MONGODB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: yelp-secret
+                  key: MONGODB_URL
+            - name: MONGODB_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: yelp-config
+                  key: MONGODB_DB
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: yelp-config
+                  key: KAFKA_BOOTSTRAP_SERVERS
+            - name: KAFKA_REVIEW_CREATED_TOPIC
+              valueFrom:
+                configMapKeyRef:
+                  name: yelp-config
+                  key: KAFKA_REVIEW_CREATED_TOPIC
+            - name: KAFKA_REVIEW_UPDATED_TOPIC
+              valueFrom:
+                configMapKeyRef:
+                  name: yelp-config
+                  key: KAFKA_REVIEW_UPDATED_TOPIC
+            - name: KAFKA_REVIEW_DELETED_TOPIC
+              valueFrom:
+                configMapKeyRef:
+                  name: yelp-config
+                  key: KAFKA_REVIEW_DELETED_TOPIC

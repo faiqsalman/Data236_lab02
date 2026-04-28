@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: yelp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: 471112632856.dkr.ecr.us-east-1.amazonaws.com/yelp-backend:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: MONGODB_URL
+              value: "mongodb://mongo:27017"
+            - name: MONGODB_DB
+              value: "yelp_lab2"
+            - name: SECRET_KEY
+              value: "change-me-in-production"
+            - name: ALGORITHM
+              value: "HS256"
+            - name: ACCESS_TOKEN_EXPIRE_MINUTES
+              value: "1440"
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka:9092"
+            - name: KAFKA_REVIEW_CREATED_TOPIC
+              value: "review.created"
+            - name: KAFKA_REVIEW_UPDATED_TOPIC
+              value: "review.updated"
+            - name: KAFKA_REVIEW_DELETED_TOPIC
+              value: "review.deleted"
+            - name: OLLAMA_HOST
+              value: "http://host.docker.internal:11434"
+            - name: OLLAMA_MODEL
+              value: "llama3.2"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: yelp
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 8000
+      targetPort: 8000
+  type: NodePort
