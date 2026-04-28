@@ -1,9 +1,13 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from bson import ObjectId
 
-from app.database import reviews_collection, restaurants_collection
+from app.database import reviews_collection
 from app.schemas.review import ReviewOut, ReviewUpdate
 from app.utils.auth import get_current_user
+from app.kafka_producer import publish_event
+from app.config import settings
 
 router = APIRouter()
 
@@ -12,21 +16,6 @@ def to_object_id(value: str) -> ObjectId:
     if not ObjectId.is_valid(value):
         raise HTTPException(status_code=400, detail="Invalid ID")
     return ObjectId(value)
-
-
-def recalculate_restaurant_rating(restaurant_id: str):
-    reviews = list(reviews_collection.find({"restaurant_id": restaurant_id}))
-    review_count = len(reviews)
-    avg_rating = (
-        sum(float(review.get("rating", 0)) for review in reviews) / review_count
-        if review_count > 0
-        else 0.0
-    )
-
-    restaurants_collection.update_one(
-        {"_id": to_object_id(restaurant_id)},
-        {"$set": {"review_count": review_count, "avg_rating": avg_rating}},
-    )
 
 
 def serialize_review(review: dict, user_name: str | None = None) -> ReviewOut:
@@ -55,18 +44,30 @@ def update_review(
     if review.get("user_id") != current_user["_id"]:
         raise HTTPException(status_code=403, detail="You can only update your own review")
 
-    data = payload.model_dump(exclude_unset=True)
+    event = {
+        "review_id": review_id,
+        "rating": payload.rating,
+        "comment": payload.comment,
+    }
 
-    if data:
-        reviews_collection.update_one(
-            {"_id": to_object_id(review_id)},
-            {"$set": data},
-        )
+    publish_event(settings.KAFKA_REVIEW_UPDATED_TOPIC, event)
 
-    updated_review = reviews_collection.find_one({"_id": to_object_id(review_id)})
-    recalculate_restaurant_rating(updated_review["restaurant_id"])
+    updated_preview = review.copy()
+    if payload.rating is not None:
+        updated_preview["rating"] = payload.rating
+    if payload.comment is not None:
+        updated_preview["comment"] = payload.comment
 
-    return serialize_review(updated_review, current_user.get("name"))
+    return ReviewOut(
+        id=review_id,
+        user_id=updated_preview.get("user_id"),
+        restaurant_id=updated_preview.get("restaurant_id"),
+        rating=updated_preview.get("rating"),
+        comment=updated_preview.get("comment"),
+        photo_url=updated_preview.get("photo_url"),
+        created_at=updated_preview.get("created_at", datetime.now(timezone.utc)),
+        user_name=current_user.get("name"),
+    )
 
 
 @router.delete("/{review_id}", status_code=204)
@@ -81,10 +82,10 @@ def delete_review(
     if review.get("user_id") != current_user["_id"]:
         raise HTTPException(status_code=403, detail="You can only delete your own review")
 
-    restaurant_id = review.get("restaurant_id")
-    reviews_collection.delete_one({"_id": to_object_id(review_id)})
+    event = {
+        "review_id": review_id,
+    }
 
-    if restaurant_id:
-        recalculate_restaurant_rating(restaurant_id)
+    publish_event(settings.KAFKA_REVIEW_DELETED_TOPIC, event)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -223,27 +223,26 @@ def create_review(
     if not restaurant:
         raise HTTPException(status_code=404, detail="Restaurant not found")
 
-    review_doc = {
+    from app.kafka_producer import publish_event
+    from app.config import settings
+
+    event = {
         "user_id": current_user["_id"],
         "restaurant_id": restaurant_id,
         "rating": payload.rating,
         "comment": payload.comment,
         "photo_url": None,
-        "created_at": datetime.now(timezone.utc),
     }
 
-    result = reviews_collection.insert_one(review_doc)
-    review = reviews_collection.find_one({"_id": result.inserted_id})
-
-    recalculate_restaurant_rating(restaurant_id)
+    publish_event(settings.KAFKA_REVIEW_CREATED_TOPIC, event)
 
     return ReviewOut(
-        id=str(review.get("_id")),
-        user_id=review.get("user_id"),
-        restaurant_id=review.get("restaurant_id"),
-        rating=review.get("rating"),
-        comment=review.get("comment"),
-        photo_url=review.get("photo_url"),
-        created_at=review.get("created_at"),
+        id="pending",
+        user_id=current_user["_id"],
+        restaurant_id=restaurant_id,
+        rating=payload.rating,
+        comment=payload.comment,
+        photo_url=None,
+        created_at=datetime.now(timezone.utc),
         user_name=current_user.get("name"),
     )

@@ -1,7 +1,5 @@
 fastapi==0.115.6
 uvicorn[standard]==0.32.1
-sqlalchemy==2.0.36
-pymysql==1.1.1
 bcrypt==4.2.1
 python-jose[cryptography]==3.3.0
 pydantic[email]==2.10.3
@@ -13,4 +11,4 @@ tavily-python==0.5.0
 pymongo
 python-dotenv
 passlib[bcrypt]
-python-jose[cryptography]
+confluent-kafka
