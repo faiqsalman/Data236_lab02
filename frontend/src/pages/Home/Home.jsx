@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useDispatch } from 'react-redux'
 import Footer from '../../components/layout/Footer'
 import ChatWidget from '../../components/ai/ChatWidget'
 import api from '../../services/api'
+import { setRestaurants as setRestaurantsRedux } from '../../features/restaurants/restaurantSlice'
 
 const HERO_IMAGES = [
   'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1600&q=80',
@@ -48,6 +50,8 @@ function getRestaurantImage(restaurant) {
 }
 
 export default function Home() {
+  const dispatch = useDispatch()
+
   const [restaurants, setRestaurants] = useState([])
   const [loading, setLoading] = useState(true)
   const [heroIndex, setHeroIndex] = useState(0)
@@ -56,17 +60,21 @@ export default function Home() {
     const loadRestaurants = async () => {
       try {
         const res = await api.get('/restaurants')
-        setRestaurants(Array.isArray(res.data) ? res.data : [])
+        const restaurantList = Array.isArray(res.data) ? res.data : []
+
+        setRestaurants(restaurantList)
+        dispatch(setRestaurantsRedux(restaurantList))
       } catch (err) {
         console.error('Failed to load restaurants:', err)
         setRestaurants([])
+        dispatch(setRestaurantsRedux([]))
       } finally {
         setLoading(false)
       }
     }
 
     loadRestaurants()
-  }, [])
+  }, [dispatch])
 
   useEffect(() => {
     const interval = setInterval(() => {

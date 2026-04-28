@@ -1,10 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useDispatch } from 'react-redux'
 import PageHeader from '../../components/layout/PageHeader'
 import Footer from '../../components/layout/Footer'
 import api from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import { claimRestaurant } from '../../services/restaurantService'
+import {
+  setSelectedRestaurant,
+  clearSelectedRestaurant,
+} from '../../features/restaurants/restaurantSlice'
+import { setReviews, clearReviews } from '../../features/reviews/reviewSlice'
 
 function Stars({ rating = 0, size = 'text-base' }) {
   const rounded = Math.round(Number(rating) || 0)
@@ -53,9 +59,10 @@ function getRestaurantImage(restaurant) {
 export default function RestaurantDetails() {
   const { id } = useParams()
   const { user } = useAuth()
+  const dispatch = useDispatch()
 
   const [restaurant, setRestaurant] = useState(null)
-  const [reviews, setReviews] = useState([])
+  const [reviews, setReviewsState] = useState([])
   const [loadingRestaurant, setLoadingRestaurant] = useState(true)
   const [loadingReviews, setLoadingReviews] = useState(true)
   const [claiming, setClaiming] = useState(false)
@@ -66,6 +73,7 @@ export default function RestaurantDetails() {
       try {
         const res = await api.get(`/restaurants/${id}`)
         setRestaurant(res.data)
+        dispatch(setSelectedRestaurant(res.data))
       } catch (err) {
         console.error('Failed to load restaurant:', err)
         setError(err.response?.data?.detail || 'Failed to load restaurant.')
@@ -77,10 +85,13 @@ export default function RestaurantDetails() {
     const loadReviews = async () => {
       try {
         const res = await api.get(`/restaurants/${id}/reviews`)
-        setReviews(Array.isArray(res.data) ? res.data : [])
+        const reviewList = Array.isArray(res.data) ? res.data : []
+        setReviewsState(reviewList)
+        dispatch(setReviews(reviewList))
       } catch (err) {
         console.error('Failed to load reviews:', err)
-        setReviews([])
+        setReviewsState([])
+        dispatch(setReviews([]))
       } finally {
         setLoadingReviews(false)
       }
@@ -90,13 +101,19 @@ export default function RestaurantDetails() {
       loadRestaurant()
       loadReviews()
     }
-  }, [id])
+
+    return () => {
+      dispatch(clearSelectedRestaurant())
+      dispatch(clearReviews())
+    }
+  }, [id, dispatch])
 
   const handleClaimRestaurant = async () => {
     try {
       setClaiming(true)
       const res = await claimRestaurant(restaurant.id)
       setRestaurant(res.data)
+      dispatch(setSelectedRestaurant(res.data))
     } catch (err) {
       alert(err.response?.data?.detail || 'Failed to claim restaurant.')
     } finally {
@@ -140,7 +157,6 @@ export default function RestaurantDetails() {
 
   return (
     <div className="min-h-screen bg-white">
-
       <main className="max-w-6xl mx-auto px-4 py-8">
         <p className="text-sm text-gray-500 mb-4">
           <Link to="/" className="hover:underline">
