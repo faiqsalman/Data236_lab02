@@ -6,9 +6,9 @@ import Signup from './pages/Auth/Signup'
 import SearchResults from './pages/Search/SearchResults'
 import RestaurantDetails from './pages/Restaurant/RestaurantDetails'
 import WriteReview from './pages/Review/WriteReview'
-import AIAssistant from './pages/AI/AIAssistant'
 import Profile from './pages/Profile/Profile'
 import AddRestaurant from './pages/Restaurant/AddRestaurant'
+import AssistantPage from './pages/AI/AssistantPage'
 import { useAuth } from './context/AuthContext'
 
 function ProtectedRoute({ children }) {
@@ -38,7 +38,8 @@ export default function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/search" element={<SearchResults />} />
         <Route path="/restaurants/:id" element={<RestaurantDetails />} />
-        <Route path="/ai-assistant" element={<AIAssistant />} />
+        <Route path="/assistant" element={<AssistantPage />} />
+
         <Route
           path="/restaurants/:id/write-review"
           element={
@@ -47,6 +48,7 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/profile"
           element={
@@ -55,6 +57,7 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/add-restaurant"
           element={

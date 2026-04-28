@@ -1,0 +1,93 @@
+
+services:
+  mongo:
+    image: mongo:6.0
+    container_name: yelp-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: yelp-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: yelp-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: yelp-backend
+    depends_on:
+      - mongo
+      - kafka
+    ports:
+      - "8000:8000"
+    environment:
+      MONGODB_URL: mongodb://mongo:27017
+      MONGODB_DB: yelp_lab2
+      SECRET_KEY: lab2-local-dev-secret-key-123456789
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 1440
+      OLLAMA_HOST: http://host.docker.internal:11434
+      OLLAMA_MODEL: llama3.2
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_REVIEW_CREATED_TOPIC: review.created
+      KAFKA_REVIEW_UPDATED_TOPIC: review.updated
+      KAFKA_REVIEW_DELETED_TOPIC: review.deleted
+    volumes:
+      - ./backend/uploads:/app/uploads
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: worker.Dockerfile
+    container_name: yelp-review-worker
+    depends_on:
+      - mongo
+      - kafka
+    environment:
+      MONGODB_URL: mongodb://mongo:27017
+      MONGODB_DB: yelp_lab2
+      SECRET_KEY: lab2-local-dev-secret-key-123456789
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 1440
+      OLLAMA_HOST: http://host.docker.internal:11434
+      OLLAMA_MODEL: llama3.2
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_REVIEW_CREATED_TOPIC: review.created
+      KAFKA_REVIEW_UPDATED_TOPIC: review.updated
+      KAFKA_REVIEW_DELETED_TOPIC: review.deleted
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: yelp-frontend
+    depends_on:
+      - backend
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+
+volumes:
+  mongo_data:

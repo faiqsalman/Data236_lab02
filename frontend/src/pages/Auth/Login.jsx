@@ -18,7 +18,10 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
+    setForm((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }))
   }
 
   const handleSubmit = async (e) => {
@@ -27,18 +30,47 @@ export default function Login() {
     setLoading(true)
 
     try {
+      console.log('LOGIN FORM SENT:', form)
+
       const res = await loginRequest(form)
-      const token = res.data.access_token
+      console.log('LOGIN RESPONSE:', res.data)
+
+      const token = res.data?.access_token
+      if (!token) {
+        throw new Error('Login succeeded but no access token was returned')
+      }
 
       localStorage.setItem('token', token)
 
-      const meRes = await getMe()
-      login(meRes.data, token)
+      try {
+        const meRes = await getMe()
+        console.log('GET ME RESPONSE:', meRes.data)
+        login(meRes.data, token)
+        navigate('/')
+      } catch (meErr) {
+        console.log('GET ME STATUS:', meErr.response?.status)
+        console.log('GET ME DATA:', meErr.response?.data)
+        console.log('GET ME FULL ERROR:', meErr)
 
-      navigate('/')
+        setError(
+          meErr.response?.data?.detail ||
+            meErr.response?.data?.message ||
+            'Login worked, but fetching user profile failed.'
+        )
+      }
     } catch (err) {
       localStorage.removeItem('token')
-      setError(err.response?.data?.detail || 'Invalid email or password.')
+
+      console.log('LOGIN STATUS:', err.response?.status)
+      console.log('LOGIN DATA:', err.response?.data)
+      console.log('LOGIN FULL ERROR:', err)
+
+      setError(
+        err.response?.data?.detail ||
+          err.response?.data?.message ||
+          err.message ||
+          'Login failed. Please try again.'
+      )
     } finally {
       setLoading(false)
     }
@@ -53,30 +85,26 @@ export default function Login() {
         backgroundPosition: 'center',
       }}
     >
-      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl p-8">
-  
-        {/* CLOSE BUTTON */}
-          <button
-            onClick={() => navigate('/')}
-            className="absolute top-4 right-4 text-gray-500 hover:text-black text-xl font-bold"
-            >
-            ✕
-          </button>
+      <div className="relative w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
+        <button
+          onClick={() => navigate('/')}
+          className="absolute top-4 right-4 text-xl font-bold text-gray-500 hover:text-black"
+        >
+          ✕
+        </button>
 
-        <h1 className="text-3xl font-bold text-center mb-2">Log In</h1>
-        <p className="text-center text-gray-500 mb-6">
-          Welcome back to YelpClone
-        </p>
+        <h1 className="mb-2 text-center text-3xl font-bold">Log In</h1>
+        <p className="mb-6 text-center text-gray-500">Welcome back to YelpClone</p>
 
         {error && (
-          <div className="mb-4 rounded-lg bg-red-100 text-red-700 px-4 py-3 text-sm">
+          <div className="mb-4 rounded-lg bg-red-100 px-4 py-3 text-sm text-red-700">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block mb-1 font-medium text-gray-800">Email</label>
+            <label className="mb-1 block font-medium text-gray-800">Email</label>
             <input
               type="email"
               name="email"
@@ -88,7 +116,7 @@ export default function Login() {
           </div>
 
           <div>
-            <label className="block mb-1 font-medium text-gray-800">Password</label>
+            <label className="mb-1 block font-medium text-gray-800">Password</label>
             <input
               type="password"
               name="password"
@@ -102,15 +130,15 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#d32323] hover:bg-red-700 text-white font-semibold py-3 rounded-lg transition"
+            className="w-full rounded-lg bg-[#d32323] py-3 font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
           >
             {loading ? 'Logging in...' : 'Log In'}
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-500 mt-6">
+        <p className="mt-6 text-center text-sm text-gray-500">
           Don&apos;t have an account?{' '}
-          <Link to="/signup" className="text-[#d32323] hover:underline font-medium">
+          <Link to="/signup" className="font-medium text-[#d32323] hover:underline">
             Sign Up
           </Link>
         </p>
