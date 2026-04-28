@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field
-from typing import Optional
 from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel, Field
 
 
 class ReviewCreate(BaseModel):
@@ -14,13 +15,13 @@ class ReviewUpdate(BaseModel):
 
 
 class ReviewOut(BaseModel):
-    id: int
-    user_id: int
-    restaurant_id: int
+    id: str
+    user_id: str
+    restaurant_id: str
     rating: int
-    comment: Optional[str]
-    photo_url: Optional[str]
-    created_at: datetime
+    comment: Optional[str] = None
+    photo_url: Optional[str] = None
+    created_at: Optional[datetime] = None
     user_name: Optional[str] = None
 
     model_config = {"from_attributes": True}

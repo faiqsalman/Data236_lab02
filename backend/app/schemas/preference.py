@@ -1,5 +1,5 @@
-from pydantic import BaseModel
 from typing import Optional
+from pydantic import BaseModel
 
 
 class PreferenceUpdate(BaseModel):
@@ -13,7 +13,7 @@ class PreferenceUpdate(BaseModel):
 
 
 class PreferenceOut(PreferenceUpdate):
-    id: int
-    user_id: int
+    id: str
+    user_id: str
 
     model_config = {"from_attributes": True}

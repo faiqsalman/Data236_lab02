@@ -1,23 +1,17 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from pymongo import MongoClient
 from app.config import settings
 
-DATABASE_URL = (
-    f"mysql+pymysql://{settings.db_user}:{settings.db_password}"
-    f"@{settings.db_host}:{settings.db_port}/{settings.db_name}"
-)
+client = MongoClient(settings.MONGODB_URL)
+db = client[settings.MONGODB_DB]
 
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-
-class Base(DeclarativeBase):
-    pass
+users_collection = db["users"]
+sessions_collection = db["sessions"]
+restaurants_collection = db["restaurants"]
+reviews_collection = db["reviews"]
+favorites_collection = db["favorites"]
+preferences_collection = db["user_preferences"]
+activity_logs_collection = db["activity_logs"]
 
 
 def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    return db

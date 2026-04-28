@@ -1,80 +1,90 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy import func
-from sqlalchemy.orm import Session
+from bson import ObjectId
 
-from app.database import get_db
-from app.models.review import Review
-from app.models.restaurant import Restaurant
-from app.models.user import User
+from app.database import reviews_collection, restaurants_collection
 from app.schemas.review import ReviewOut, ReviewUpdate
 from app.utils.auth import get_current_user
 
 router = APIRouter()
 
 
-def recalculate_restaurant_rating(db: Session, restaurant_id: int):
-    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
-    if not restaurant:
-        return
+def to_object_id(value: str) -> ObjectId:
+    if not ObjectId.is_valid(value):
+        raise HTTPException(status_code=400, detail="Invalid ID")
+    return ObjectId(value)
 
-    stats = (
-        db.query(
-            func.count(Review.id).label("review_count"),
-            func.avg(Review.rating).label("avg_rating"),
-        )
-        .filter(Review.restaurant_id == restaurant_id)
-        .first()
+
+def recalculate_restaurant_rating(restaurant_id: str):
+    reviews = list(reviews_collection.find({"restaurant_id": restaurant_id}))
+    review_count = len(reviews)
+    avg_rating = (
+        sum(float(review.get("rating", 0)) for review in reviews) / review_count
+        if review_count > 0
+        else 0.0
     )
 
-    restaurant.review_count = stats.review_count or 0
-    restaurant.avg_rating = float(stats.avg_rating or 0.0)
-    db.commit()
-    db.refresh(restaurant)
+    restaurants_collection.update_one(
+        {"_id": to_object_id(restaurant_id)},
+        {"$set": {"review_count": review_count, "avg_rating": avg_rating}},
+    )
+
+
+def serialize_review(review: dict, user_name: str | None = None) -> ReviewOut:
+    return ReviewOut(
+        id=str(review.get("_id")),
+        user_id=review.get("user_id"),
+        restaurant_id=review.get("restaurant_id"),
+        rating=review.get("rating"),
+        comment=review.get("comment"),
+        photo_url=review.get("photo_url"),
+        created_at=review.get("created_at"),
+        user_name=user_name,
+    )
 
 
 @router.put("/{review_id}", response_model=ReviewOut)
 def update_review(
-    review_id: int,
+    review_id: str,
     payload: ReviewUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
-    review = db.query(Review).filter(Review.id == review_id).first()
+    review = reviews_collection.find_one({"_id": to_object_id(review_id)})
     if not review:
         raise HTTPException(status_code=404, detail="Review not found")
 
-    if review.user_id != current_user.id:
+    if review.get("user_id") != current_user["_id"]:
         raise HTTPException(status_code=403, detail="You can only update your own review")
 
     data = payload.model_dump(exclude_unset=True)
-    for key, value in data.items():
-        setattr(review, key, value)
 
-    db.commit()
-    db.refresh(review)
+    if data:
+        reviews_collection.update_one(
+            {"_id": to_object_id(review_id)},
+            {"$set": data},
+        )
 
-    recalculate_restaurant_rating(db, review.restaurant_id)
+    updated_review = reviews_collection.find_one({"_id": to_object_id(review_id)})
+    recalculate_restaurant_rating(updated_review["restaurant_id"])
 
-    return review
+    return serialize_review(updated_review, current_user.get("name"))
 
 
 @router.delete("/{review_id}", status_code=204)
 def delete_review(
-    review_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    review_id: str,
+    current_user: dict = Depends(get_current_user),
 ):
-    review = db.query(Review).filter(Review.id == review_id).first()
+    review = reviews_collection.find_one({"_id": to_object_id(review_id)})
     if not review:
         raise HTTPException(status_code=404, detail="Review not found")
 
-    if review.user_id != current_user.id:
+    if review.get("user_id") != current_user["_id"]:
         raise HTTPException(status_code=403, detail="You can only delete your own review")
 
-    restaurant_id = review.restaurant_id
-    db.delete(review)
-    db.commit()
+    restaurant_id = review.get("restaurant_id")
+    reviews_collection.delete_one({"_id": to_object_id(review_id)})
 
-    recalculate_restaurant_rating(db, restaurant_id)
+    if restaurant_id:
+        recalculate_restaurant_rating(restaurant_id)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)

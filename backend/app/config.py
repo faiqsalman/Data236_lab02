@@ -2,21 +2,18 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    # Database
-    db_host: str = "localhost"
-    db_port: int = 3306
-    db_name: str = "yelpclone"
-    db_user: str = "root"
-    db_password: str = ""
+    # MongoDB
+    MONGODB_URL: str = "mongodb://localhost:27017"
+    MONGODB_DB: str = "yelp_lab2"
 
     # JWT
-    secret_key: str = "change-me-in-production"
-    algorithm: str = "HS256"
-    access_token_expire_minutes: int = 60 * 24
+    SECRET_KEY: str = "change-me-in-production"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
 
     # Ollama
-    ollama_host: str = "http://localhost:11434"
-    ollama_model: str = "llama3.2"
+    OLLAMA_HOST: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "llama3.2"
 
     model_config = SettingsConfigDict(
         env_file=".env",

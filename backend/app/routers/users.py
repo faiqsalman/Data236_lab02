@@ -1,16 +1,18 @@
 import os
 import shutil
 import uuid
+from datetime import datetime, timezone
 
+from bson import ObjectId
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
-from sqlalchemy.orm import Session
 
-from app.database import get_db
-from app.models.user import User
-from app.models.user_preference import UserPreference
-from app.models.favorite import Favorite
-from app.models.restaurant import Restaurant
-from app.models.review import Review
+from app.database import (
+    users_collection,
+    preferences_collection,
+    favorites_collection,
+    restaurants_collection,
+    reviews_collection,
+)
 from app.schemas.user import UserOut, UserUpdate
 from app.schemas.preference import PreferenceOut, PreferenceUpdate
 from app.utils.auth import get_current_user
@@ -18,41 +20,79 @@ from app.utils.auth import get_current_user
 router = APIRouter()
 
 
+def to_object_id(value: str) -> ObjectId:
+    if not ObjectId.is_valid(value):
+        raise HTTPException(status_code=400, detail="Invalid ID")
+    return ObjectId(value)
+
+
+def serialize_user(user: dict) -> dict:
+    return {
+        "id": str(user.get("_id")),
+        "name": user.get("name"),
+        "email": user.get("email"),
+        "phone": user.get("phone"),
+        "about_me": user.get("about_me"),
+        "city": user.get("city"),
+        "country": user.get("country"),
+        "state": user.get("state"),
+        "languages": user.get("languages"),
+        "gender": user.get("gender"),
+        "profile_pic_url": user.get("profile_pic_url"),
+        "created_at": user.get("created_at"),
+    }
+
+
+def serialize_preference(preference: dict) -> dict:
+    return {
+        "id": str(preference.get("_id")),
+        "user_id": preference.get("user_id"),
+        "cuisines": preference.get("cuisines"),
+        "price_range": preference.get("price_range"),
+        "dietary_needs": preference.get("dietary_needs"),
+        "ambiance": preference.get("ambiance"),
+        "sort_by": preference.get("sort_by"),
+        "preferred_location": preference.get("preferred_location"),
+        "search_radius_miles": preference.get("search_radius_miles"),
+    }
+
+
 @router.get("/me", response_model=UserOut)
-def get_profile(current_user: User = Depends(get_current_user)):
-    return current_user
+def get_profile(current_user: dict = Depends(get_current_user)):
+    return serialize_user(current_user)
 
 
 @router.put("/me", response_model=UserOut)
 def update_profile(
     payload: UserUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     data = payload.model_dump(exclude_unset=True)
 
     if "email" in data:
-        existing_user = (
-            db.query(User)
-            .filter(User.email == data["email"], User.id != current_user.id)
-            .first()
+        existing_user = users_collection.find_one(
+            {
+                "email": data["email"],
+                "_id": {"$ne": to_object_id(current_user["_id"])},
+            }
         )
         if existing_user:
             raise HTTPException(status_code=400, detail="Email already in use")
 
-    for key, value in data.items():
-        setattr(current_user, key, value)
+    if data:
+        users_collection.update_one(
+            {"_id": to_object_id(current_user["_id"])},
+            {"$set": data},
+        )
 
-    db.commit()
-    db.refresh(current_user)
-    return current_user
+    updated_user = users_collection.find_one({"_id": to_object_id(current_user["_id"])})
+    return serialize_user(updated_user)
 
 
 @router.post("/me/photo")
 def upload_profile_picture(
     file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     os.makedirs("uploads", exist_ok=True)
 
@@ -63,185 +103,201 @@ def upload_profile_picture(
     with open(filepath, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    current_user.profile_pic_url = f"/uploads/{filename}"
-    db.commit()
-    db.refresh(current_user)
+    profile_pic_url = f"/uploads/{filename}"
+
+    users_collection.update_one(
+        {"_id": to_object_id(current_user["_id"])},
+        {"$set": {"profile_pic_url": profile_pic_url}},
+    )
 
     return {
         "message": "Profile picture uploaded successfully",
-        "profile_pic_url": current_user.profile_pic_url,
+        "profile_pic_url": profile_pic_url,
     }
 
 
 @router.get("/me/preferences", response_model=PreferenceOut)
-def get_preferences(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    preference = (
-        db.query(UserPreference)
-        .filter(UserPreference.user_id == current_user.id)
-        .first()
-    )
+def get_preferences(current_user: dict = Depends(get_current_user)):
+    preference = preferences_collection.find_one({"user_id": current_user["_id"]})
 
     if not preference:
-        preference = UserPreference(user_id=current_user.id, search_radius_miles=10)
-        db.add(preference)
-        db.commit()
-        db.refresh(preference)
+        preference_doc = {
+            "user_id": current_user["_id"],
+            "cuisines": None,
+            "price_range": None,
+            "dietary_needs": None,
+            "ambiance": None,
+            "sort_by": None,
+            "preferred_location": None,
+            "search_radius_miles": 10,
+            "updated_at": datetime.now(timezone.utc),
+        }
+        result = preferences_collection.insert_one(preference_doc)
+        preference = preferences_collection.find_one({"_id": result.inserted_id})
 
-    return preference
+    return serialize_preference(preference)
 
 
 @router.put("/me/preferences", response_model=PreferenceOut)
 def update_preferences(
     payload: PreferenceUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
-    preference = (
-        db.query(UserPreference)
-        .filter(UserPreference.user_id == current_user.id)
-        .first()
-    )
+    preference = preferences_collection.find_one({"user_id": current_user["_id"]})
+    data = payload.model_dump(exclude_unset=True)
 
     if not preference:
-        preference = UserPreference(user_id=current_user.id)
-        db.add(preference)
+        preference_doc = {
+            "user_id": current_user["_id"],
+            "cuisines": data.get("cuisines"),
+            "price_range": data.get("price_range"),
+            "dietary_needs": data.get("dietary_needs"),
+            "ambiance": data.get("ambiance"),
+            "sort_by": data.get("sort_by"),
+            "preferred_location": data.get("preferred_location"),
+            "search_radius_miles": data.get("search_radius_miles", 10),
+            "updated_at": datetime.now(timezone.utc),
+        }
+        result = preferences_collection.insert_one(preference_doc)
+        preference = preferences_collection.find_one({"_id": result.inserted_id})
+        return serialize_preference(preference)
 
-    data = payload.model_dump(exclude_unset=True)
-    for key, value in data.items():
-        setattr(preference, key, value)
+    if "search_radius_miles" not in data and preference.get("search_radius_miles") is None:
+        data["search_radius_miles"] = 10
 
-    if preference.search_radius_miles is None:
-        preference.search_radius_miles = 10
+    data["updated_at"] = datetime.now(timezone.utc)
 
-    db.commit()
-    db.refresh(preference)
-    return preference
+    preferences_collection.update_one(
+        {"_id": preference["_id"]},
+        {"$set": data},
+    )
+
+    updated_preference = preferences_collection.find_one({"_id": preference["_id"]})
+    return serialize_preference(updated_preference)
 
 
 @router.get("/me/favorites")
-def get_favorites(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    favorites = (
-        db.query(Restaurant)
-        .join(Favorite, Favorite.restaurant_id == Restaurant.id)
-        .filter(Favorite.user_id == current_user.id)
-        .all()
-    )
+def get_favorites(current_user: dict = Depends(get_current_user)):
+    favorite_docs = list(favorites_collection.find({"user_id": current_user["_id"]}))
+    restaurant_ids = [
+        to_object_id(fav["restaurant_id"])
+        for fav in favorite_docs
+        if fav.get("restaurant_id") and ObjectId.is_valid(fav["restaurant_id"])
+    ]
 
-    return favorites
+    if not restaurant_ids:
+        return []
+
+    restaurants = list(restaurants_collection.find({"_id": {"$in": restaurant_ids}}))
+
+    return [
+        {
+            "id": str(restaurant.get("_id")),
+            "name": restaurant.get("name"),
+            "city": restaurant.get("city"),
+            "state": restaurant.get("state"),
+            "country": restaurant.get("country"),
+            "cuisine_type": restaurant.get("cuisine_type"),
+            "avg_rating": restaurant.get("avg_rating"),
+            "review_count": restaurant.get("review_count"),
+            "photo_url": restaurant.get("photo_url"),
+        }
+        for restaurant in restaurants
+    ]
 
 
 @router.post("/me/favorites/{restaurant_id}")
 def add_favorite(
-    restaurant_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    restaurant_id: str,
+    current_user: dict = Depends(get_current_user),
 ):
-    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+    restaurant = restaurants_collection.find_one({"_id": to_object_id(restaurant_id)})
     if not restaurant:
         raise HTTPException(status_code=404, detail="Restaurant not found")
 
-    favorite = (
-        db.query(Favorite)
-        .filter(
-            Favorite.user_id == current_user.id,
-            Favorite.restaurant_id == restaurant_id,
-        )
-        .first()
+    favorite = favorites_collection.find_one(
+        {
+            "user_id": current_user["_id"],
+            "restaurant_id": restaurant_id,
+        }
     )
 
     if not favorite:
-        favorite = Favorite(user_id=current_user.id, restaurant_id=restaurant_id)
-        db.add(favorite)
-        db.commit()
+        favorites_collection.insert_one(
+            {
+                "user_id": current_user["_id"],
+                "restaurant_id": restaurant_id,
+                "created_at": datetime.now(timezone.utc),
+            }
+        )
 
     return {"message": "Restaurant added to favorites"}
 
 
 @router.delete("/me/favorites/{restaurant_id}")
 def remove_favorite(
-    restaurant_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    restaurant_id: str,
+    current_user: dict = Depends(get_current_user),
 ):
-    favorite = (
-        db.query(Favorite)
-        .filter(
-            Favorite.user_id == current_user.id,
-            Favorite.restaurant_id == restaurant_id,
-        )
-        .first()
+    favorites_collection.delete_one(
+        {
+            "user_id": current_user["_id"],
+            "restaurant_id": restaurant_id,
+        }
     )
-
-    if favorite:
-        db.delete(favorite)
-        db.commit()
 
     return {"message": "Restaurant removed from favorites"}
 
 
 @router.get("/me/history")
-def get_history(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    reviews = (
-        db.query(Review)
-        .filter(Review.user_id == current_user.id)
-        .order_by(Review.created_at.desc())
-        .all()
+def get_history(current_user: dict = Depends(get_current_user)):
+    reviews = list(
+        reviews_collection.find({"user_id": current_user["_id"]}).sort("created_at", -1)
     )
 
-    restaurants_added = (
-        db.query(Restaurant)
-        .filter(Restaurant.added_by_user_id == current_user.id)
-        .order_by(Restaurant.created_at.desc())
-        .all()
+    restaurants_added = list(
+        restaurants_collection.find({"added_by_user_id": current_user["_id"]}).sort(
+            "created_at", -1
+        )
     )
 
-    restaurants_owned = (
-        db.query(Restaurant)
-        .filter(Restaurant.owner_user_id == current_user.id)
-        .order_by(Restaurant.created_at.desc())
-        .all()
+    restaurants_owned = list(
+        restaurants_collection.find({"owner_user_id": current_user["_id"]}).sort(
+            "created_at", -1
+        )
     )
 
     return {
         "reviews": [
             {
-                "id": review.id,
-                "restaurant_id": review.restaurant_id,
-                "rating": review.rating,
-                "comment": review.comment,
-                "photo_url": review.photo_url,
-                "created_at": review.created_at,
+                "id": str(review.get("_id")),
+                "restaurant_id": review.get("restaurant_id"),
+                "rating": review.get("rating"),
+                "comment": review.get("comment"),
+                "photo_url": review.get("photo_url"),
+                "created_at": review.get("created_at"),
             }
             for review in reviews
         ],
         "restaurants_added": [
             {
-                "id": restaurant.id,
-                "name": restaurant.name,
-                "city": restaurant.city,
-                "cuisine_type": restaurant.cuisine_type,
-                "avg_rating": restaurant.avg_rating,
-                "review_count": restaurant.review_count,
+                "id": str(restaurant.get("_id")),
+                "name": restaurant.get("name"),
+                "city": restaurant.get("city"),
+                "cuisine_type": restaurant.get("cuisine_type"),
+                "avg_rating": restaurant.get("avg_rating"),
+                "review_count": restaurant.get("review_count"),
             }
             for restaurant in restaurants_added
         ],
         "restaurants_owned": [
             {
-                "id": restaurant.id,
-                "name": restaurant.name,
-                "city": restaurant.city,
-                "cuisine_type": restaurant.cuisine_type,
-                "avg_rating": restaurant.avg_rating,
-                "review_count": restaurant.review_count,
+                "id": str(restaurant.get("_id")),
+                "name": restaurant.get("name"),
+                "city": restaurant.get("city"),
+                "cuisine_type": restaurant.get("cuisine_type"),
+                "avg_rating": restaurant.get("avg_rating"),
+                "review_count": restaurant.get("review_count"),
             }
             for restaurant in restaurants_owned
         ],

@@ -2,18 +2,20 @@ import json
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
+from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException
+from jose import JWTError, jwt
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.database import get_db
-from app.models.favorite import Favorite
-from app.models.restaurant import Restaurant
-from app.models.review import Review
-from app.models.user import User
-from app.models.user_preference import UserPreference
-from app.utils.auth import get_current_user
+from app.database import (
+    users_collection,
+    preferences_collection,
+    favorites_collection,
+    restaurants_collection,
+    reviews_collection,
+)
+from app.utils.auth import oauth2_scheme
 
 router = APIRouter()
 
@@ -33,106 +35,139 @@ class ChatResponse(BaseModel):
     recommendations: list[dict] = []
 
 
-def serialize_restaurant(restaurant: Restaurant) -> dict:
+def serialize_restaurant(restaurant: dict) -> dict:
     return {
-        "id": restaurant.id,
-        "name": restaurant.name,
-        "cuisine_type": restaurant.cuisine_type,
-        "city": restaurant.city,
-        "address": restaurant.address,
-        "pricing_tier": restaurant.pricing_tier,
-        "avg_rating": float(restaurant.avg_rating or 0),
-        "review_count": int(restaurant.review_count or 0),
-        "description": restaurant.description,
+        "id": str(restaurant.get("_id")),
+        "name": restaurant.get("name"),
+        "cuisine_type": restaurant.get("cuisine_type"),
+        "city": restaurant.get("city"),
+        "address": restaurant.get("address"),
+        "pricing_tier": restaurant.get("pricing_tier"),
+        "avg_rating": float(restaurant.get("avg_rating", 0) or 0),
+        "review_count": int(restaurant.get("review_count", 0) or 0),
+        "description": restaurant.get("description"),
     }
 
 
-def get_user_context(db: Session, user: User | None) -> dict:
+def get_optional_current_user(token: str = Depends(oauth2_scheme)) -> dict | None:
+    if not token:
+        return None
+
+    try:
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
+        )
+        user_id = payload.get("sub")
+        if not user_id:
+            return None
+
+        if ObjectId.is_valid(user_id):
+            return users_collection.find_one({"_id": ObjectId(user_id)})
+
+        return None
+    except JWTError:
+        return None
+    except Exception:
+        return None
+
+
+def get_user_context(user: dict | None) -> dict:
     if not user:
         return {"is_authenticated": False}
 
-    preference = (
-        db.query(UserPreference)
-        .filter(UserPreference.user_id == user.id)
-        .first()
-    )
+    user_id = str(user["_id"])
 
+    preference = preferences_collection.find_one({"user_id": user_id})
+
+    favorite_docs = list(favorites_collection.find({"user_id": user_id}).limit(10))
+    favorite_restaurant_ids = [
+        ObjectId(doc["restaurant_id"])
+        for doc in favorite_docs
+        if doc.get("restaurant_id") and ObjectId.is_valid(doc["restaurant_id"])
+    ]
     favorites = (
-        db.query(Restaurant)
-        .join(Favorite, Favorite.restaurant_id == Restaurant.id)
-        .filter(Favorite.user_id == user.id)
-        .limit(10)
-        .all()
+        list(restaurants_collection.find({"_id": {"$in": favorite_restaurant_ids}}))
+        if favorite_restaurant_ids
+        else []
     )
 
-    owned_restaurants = (
-        db.query(Restaurant)
-        .filter(Restaurant.owner_user_id == user.id)
-        .limit(10)
-        .all()
+    owned_restaurants = list(
+        restaurants_collection.find({"owner_user_id": user_id}).limit(10)
     )
 
-    recent_reviews = (
-        db.query(Review, Restaurant.name)
-        .join(Restaurant, Restaurant.id == Review.restaurant_id)
-        .filter(Review.user_id == user.id)
-        .order_by(Review.created_at.desc())
-        .limit(10)
-        .all()
+    recent_reviews = list(
+        reviews_collection.find({"user_id": user_id}).sort("created_at", -1).limit(10)
     )
+
+    review_restaurant_ids = [
+        ObjectId(review["restaurant_id"])
+        for review in recent_reviews
+        if review.get("restaurant_id") and ObjectId.is_valid(review["restaurant_id"])
+    ]
+    review_restaurants = (
+        list(restaurants_collection.find({"_id": {"$in": review_restaurant_ids}}))
+        if review_restaurant_ids
+        else []
+    )
+    restaurant_name_map = {str(r["_id"]): r.get("name") for r in review_restaurants}
 
     return {
         "is_authenticated": True,
         "profile": {
-            "name": user.name,
-            "city": user.city,
-            "state": user.state,
-            "country": user.country,
-            "languages": user.languages,
-            "about_me": user.about_me,
+            "name": user.get("name"),
+            "city": user.get("city"),
+            "state": user.get("state"),
+            "country": user.get("country"),
+            "languages": user.get("languages"),
+            "about_me": user.get("about_me"),
         },
         "preferences": {
-            "cuisines": preference.cuisines if preference else None,
-            "price_range": preference.price_range if preference else None,
-            "dietary_needs": preference.dietary_needs if preference else None,
-            "ambiance": preference.ambiance if preference else None,
-            "preferred_location": preference.preferred_location if preference else None,
-            "search_radius_miles": preference.search_radius_miles if preference else None,
+            "cuisines": preference.get("cuisines") if preference else None,
+            "price_range": preference.get("price_range") if preference else None,
+            "dietary_needs": preference.get("dietary_needs") if preference else None,
+            "ambiance": preference.get("ambiance") if preference else None,
+            "preferred_location": preference.get("preferred_location") if preference else None,
+            "search_radius_miles": preference.get("search_radius_miles") if preference else None,
         },
         "favorites": [serialize_restaurant(r) for r in favorites],
         "owned_restaurants": [serialize_restaurant(r) for r in owned_restaurants],
         "recent_reviews": [
             {
-                "restaurant_name": restaurant_name,
-                "rating": review.rating,
-                "comment": review.comment,
+                "restaurant_name": restaurant_name_map.get(review.get("restaurant_id")),
+                "rating": review.get("rating"),
+                "comment": review.get("comment"),
             }
-            for review, restaurant_name in recent_reviews
+            for review in recent_reviews
         ],
     }
 
 
-def get_candidate_restaurants(db: Session, user_message: str) -> list[dict]:
-    search_term = f"%{user_message.strip()}%"
-    rows = (
-        db.query(Restaurant)
-        .filter(
-            (Restaurant.name.ilike(search_term))
-            | (Restaurant.cuisine_type.ilike(search_term))
-            | (Restaurant.city.ilike(search_term))
-            | (Restaurant.description.ilike(search_term))
-        )
-        .order_by(Restaurant.avg_rating.desc(), Restaurant.review_count.desc())
-        .limit(8)
-        .all()
+def get_candidate_restaurants(user_message: str) -> list[dict]:
+    query = {}
+    if user_message.strip():
+        search_regex = {"$regex": user_message.strip(), "$options": "i"}
+        query = {
+            "$or": [
+                {"name": search_regex},
+                {"cuisine_type": search_regex},
+                {"city": search_regex},
+                {"description": search_regex},
+            ]
+        }
+
+    rows = list(
+        restaurants_collection.find(query).sort(
+            [("avg_rating", -1), ("review_count", -1)]
+        ).limit(8)
     )
 
     if not rows:
-        rows = (
-            db.query(Restaurant)
-            .order_by(Restaurant.avg_rating.desc(), Restaurant.review_count.desc())
-            .limit(8)
-            .all()
+        rows = list(
+            restaurants_collection.find({}).sort(
+                [("avg_rating", -1), ("review_count", -1)]
+            ).limit(8)
         )
 
     return [serialize_restaurant(r) for r in rows]
@@ -140,13 +175,13 @@ def get_candidate_restaurants(db: Session, user_message: str) -> list[dict]:
 
 def call_ollama(messages: list[dict]) -> str:
     payload = {
-        "model": settings.ollama_model,
+        "model": settings.OLLAMA_MODEL,
         "messages": messages,
         "stream": False,
     }
 
     req = Request(
-        url=f"{settings.ollama_host}/api/chat",
+        url=f"{settings.OLLAMA_HOST}/api/chat",
         data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json"},
         method="POST",
@@ -185,11 +220,10 @@ def call_ollama(messages: list[dict]) -> str:
 @router.post("/chat", response_model=ChatResponse)
 def chat(
     payload: ChatRequest,
-    db: Session = Depends(get_db),
-    current_user: User | None = Depends(get_current_user),
+    current_user: dict | None = Depends(get_optional_current_user),
 ):
-    user_context = get_user_context(db, current_user)
-    candidate_restaurants = get_candidate_restaurants(db, payload.message)
+    user_context = get_user_context(current_user)
+    candidate_restaurants = get_candidate_restaurants(payload.message)
 
     system_prompt = f"""
 You are a Yelp-style restaurant assistant inside a restaurant discovery app.
@@ -203,10 +237,10 @@ Rules:
 - keep the answer concise and useful
 
 User context:
-{json.dumps(user_context, indent=2)}
+{json.dumps(user_context, indent=2, default=str)}
 
 Candidate restaurants:
-{json.dumps(candidate_restaurants, indent=2)}
+{json.dumps(candidate_restaurants, indent=2, default=str)}
 """.strip()
 
     messages = [{"role": "system", "content": system_prompt}]

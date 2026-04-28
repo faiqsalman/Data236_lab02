@@ -1,13 +1,10 @@
+from datetime import datetime, timezone
 from typing import Optional, List
 
+from bson import ObjectId
 from fastapi import APIRouter, Depends, Query, HTTPException
-from sqlalchemy import func, or_
-from sqlalchemy.orm import Session
 
-from app.database import get_db
-from app.models.restaurant import Restaurant
-from app.models.review import Review
-from app.models.user import User
+from app.database import restaurants_collection, reviews_collection, users_collection
 from app.schemas.restaurant import RestaurantCreate, RestaurantOut, RestaurantUpdate
 from app.schemas.review import ReviewCreate, ReviewOut
 from app.utils.auth import get_current_user
@@ -15,24 +12,47 @@ from app.utils.auth import get_current_user
 router = APIRouter()
 
 
-def recalculate_restaurant_rating(db: Session, restaurant_id: int):
-    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
-    if not restaurant:
-        return
+def to_object_id(value: str) -> ObjectId:
+    if not ObjectId.is_valid(value):
+        raise HTTPException(status_code=400, detail="Invalid ID")
+    return ObjectId(value)
 
-    stats = (
-        db.query(
-            func.count(Review.id).label("review_count"),
-            func.avg(Review.rating).label("avg_rating"),
-        )
-        .filter(Review.restaurant_id == restaurant_id)
-        .first()
+
+def serialize_restaurant(restaurant: dict) -> dict:
+    return {
+        "id": str(restaurant.get("_id")),
+        "name": restaurant.get("name"),
+        "cuisine_type": restaurant.get("cuisine_type"),
+        "address": restaurant.get("address"),
+        "city": restaurant.get("city"),
+        "zip_code": restaurant.get("zip_code"),
+        "description": restaurant.get("description"),
+        "hours": restaurant.get("hours"),
+        "contact_phone": restaurant.get("contact_phone"),
+        "contact_email": restaurant.get("contact_email"),
+        "pricing_tier": restaurant.get("pricing_tier"),
+        "amenities": restaurant.get("amenities"),
+        "avg_rating": float(restaurant.get("avg_rating", 0.0) or 0.0),
+        "review_count": int(restaurant.get("review_count", 0) or 0),
+        "added_by_user_id": restaurant.get("added_by_user_id"),
+        "owner_user_id": restaurant.get("owner_user_id"),
+        "created_at": restaurant.get("created_at"),
+    }
+
+
+def recalculate_restaurant_rating(restaurant_id: str):
+    reviews = list(reviews_collection.find({"restaurant_id": restaurant_id}))
+    review_count = len(reviews)
+    avg_rating = (
+        sum(float(review.get("rating", 0)) for review in reviews) / review_count
+        if review_count > 0
+        else 0.0
     )
 
-    restaurant.review_count = stats.review_count or 0
-    restaurant.avg_rating = float(stats.avg_rating or 0.0)
-    db.commit()
-    db.refresh(restaurant)
+    restaurants_collection.update_one(
+        {"_id": to_object_id(restaurant_id)},
+        {"$set": {"review_count": review_count, "avg_rating": avg_rating}},
+    )
 
 
 @router.get("", response_model=List[RestaurantOut])
@@ -42,132 +62,150 @@ def search_restaurants(
     cuisine_type: Optional[str] = Query(None),
     pricing_tier: Optional[str] = Query(None),
     min_rating: Optional[float] = Query(None),
-    db: Session = Depends(get_db),
 ):
-    query = db.query(Restaurant)
+    filters = []
 
     if q:
-        search_term = f"%{q.strip()}%"
-        query = query.filter(
-            or_(
-                Restaurant.name.ilike(search_term),
-                Restaurant.description.ilike(search_term),
-                Restaurant.address.ilike(search_term),
-                Restaurant.city.ilike(search_term),
-                Restaurant.cuisine_type.ilike(search_term),
-            )
+        search_regex = {"$regex": q.strip(), "$options": "i"}
+        filters.append(
+            {
+                "$or": [
+                    {"name": search_regex},
+                    {"description": search_regex},
+                    {"address": search_regex},
+                    {"city": search_regex},
+                    {"cuisine_type": search_regex},
+                ]
+            }
         )
 
     if city:
-        query = query.filter(Restaurant.city.ilike(f"%{city}%"))
+        filters.append({"city": {"$regex": city, "$options": "i"}})
 
     if cuisine_type:
-        query = query.filter(Restaurant.cuisine_type.ilike(f"%{cuisine_type}%"))
+        filters.append({"cuisine_type": {"$regex": cuisine_type, "$options": "i"}})
 
     if pricing_tier:
-        query = query.filter(Restaurant.pricing_tier == pricing_tier)
+        filters.append({"pricing_tier": pricing_tier})
 
     if min_rating is not None:
-        query = query.filter(Restaurant.avg_rating >= min_rating)
+        filters.append({"avg_rating": {"$gte": min_rating}})
 
-    restaurants = query.order_by(Restaurant.avg_rating.desc(), Restaurant.id.desc()).all()
-    return restaurants
+    mongo_query = {"$and": filters} if filters else {}
+
+    restaurants = list(
+        restaurants_collection.find(mongo_query).sort(
+            [("avg_rating", -1), ("created_at", -1)]
+        )
+    )
+    return [serialize_restaurant(restaurant) for restaurant in restaurants]
 
 
 @router.post("", response_model=RestaurantOut, status_code=201)
 def create_restaurant(
     payload: RestaurantCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
-    restaurant = Restaurant(
+    restaurant_doc = {
         **payload.model_dump(),
-        added_by_user_id=current_user.id,
-        owner_user_id=current_user.id,
-    )
-    db.add(restaurant)
-    db.commit()
-    db.refresh(restaurant)
-    return restaurant
+        "avg_rating": 0.0,
+        "review_count": 0,
+        "added_by_user_id": current_user["_id"],
+        "owner_user_id": current_user["_id"],
+        "created_at": datetime.now(timezone.utc),
+    }
+
+    result = restaurants_collection.insert_one(restaurant_doc)
+    restaurant = restaurants_collection.find_one({"_id": result.inserted_id})
+    return serialize_restaurant(restaurant)
 
 
 @router.get("/{restaurant_id}", response_model=RestaurantOut)
-def get_restaurant(restaurant_id: int, db: Session = Depends(get_db)):
-    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+def get_restaurant(restaurant_id: str):
+    restaurant = restaurants_collection.find_one({"_id": to_object_id(restaurant_id)})
     if not restaurant:
         raise HTTPException(status_code=404, detail="Restaurant not found")
-    return restaurant
+    return serialize_restaurant(restaurant)
 
 
 @router.put("/{restaurant_id}", response_model=RestaurantOut)
 def update_restaurant(
-    restaurant_id: int,
+    restaurant_id: str,
     payload: RestaurantUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
-    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+    restaurant = restaurants_collection.find_one({"_id": to_object_id(restaurant_id)})
     if not restaurant:
         raise HTTPException(status_code=404, detail="Restaurant not found")
 
-    if restaurant.owner_user_id != current_user.id:
+    if restaurant.get("owner_user_id") != current_user["_id"]:
         raise HTTPException(status_code=403, detail="You can only update a restaurant you own")
 
     data = payload.model_dump(exclude_unset=True)
-    for key, value in data.items():
-        setattr(restaurant, key, value)
 
-    db.commit()
-    db.refresh(restaurant)
-    return restaurant
+    if data:
+        restaurants_collection.update_one(
+            {"_id": to_object_id(restaurant_id)},
+            {"$set": data},
+        )
+
+    updated_restaurant = restaurants_collection.find_one({"_id": to_object_id(restaurant_id)})
+    return serialize_restaurant(updated_restaurant)
 
 
 @router.post("/{restaurant_id}/claim", response_model=RestaurantOut)
 def claim_restaurant(
-    restaurant_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    restaurant_id: str,
+    current_user: dict = Depends(get_current_user),
 ):
-    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+    restaurant = restaurants_collection.find_one({"_id": to_object_id(restaurant_id)})
     if not restaurant:
         raise HTTPException(status_code=404, detail="Restaurant not found")
 
-    if restaurant.owner_user_id is not None:
-        if restaurant.owner_user_id == current_user.id:
-            return restaurant
+    owner_user_id = restaurant.get("owner_user_id")
+    if owner_user_id is not None:
+        if owner_user_id == current_user["_id"]:
+            return serialize_restaurant(restaurant)
         raise HTTPException(status_code=400, detail="This restaurant already has an owner")
 
-    restaurant.owner_user_id = current_user.id
-    db.commit()
-    db.refresh(restaurant)
-    return restaurant
+    restaurants_collection.update_one(
+        {"_id": to_object_id(restaurant_id)},
+        {"$set": {"owner_user_id": current_user["_id"]}},
+    )
+
+    updated_restaurant = restaurants_collection.find_one({"_id": to_object_id(restaurant_id)})
+    return serialize_restaurant(updated_restaurant)
 
 
 @router.get("/{restaurant_id}/reviews", response_model=List[ReviewOut])
-def get_reviews(restaurant_id: int, db: Session = Depends(get_db)):
-    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+def get_reviews(restaurant_id: str):
+    restaurant = restaurants_collection.find_one({"_id": to_object_id(restaurant_id)})
     if not restaurant:
         raise HTTPException(status_code=404, detail="Restaurant not found")
 
-    rows = (
-        db.query(Review, User.name)
-        .join(User, User.id == Review.user_id)
-        .filter(Review.restaurant_id == restaurant_id)
-        .order_by(Review.created_at.desc())
-        .all()
+    reviews = list(
+        reviews_collection.find({"restaurant_id": restaurant_id}).sort("created_at", -1)
     )
 
     results = []
-    for review, user_name in rows:
+    for review in reviews:
+        user_name = None
+        user_id = review.get("user_id")
+
+        if user_id and ObjectId.is_valid(user_id):
+            user = users_collection.find_one({"_id": ObjectId(user_id)})
+            if user:
+                user_name = user.get("name")
+
         results.append(
             ReviewOut(
-                id=review.id,
-                user_id=review.user_id,
-                restaurant_id=review.restaurant_id,
-                rating=review.rating,
-                comment=review.comment,
-                photo_url=review.photo_url,
-                created_at=review.created_at,
+                id=str(review.get("_id")),
+                user_id=review.get("user_id"),
+                restaurant_id=review.get("restaurant_id"),
+                rating=review.get("rating"),
+                comment=review.get("comment"),
+                photo_url=review.get("photo_url"),
+                created_at=review.get("created_at"),
                 user_name=user_name,
             )
         )
@@ -177,34 +215,35 @@ def get_reviews(restaurant_id: int, db: Session = Depends(get_db)):
 
 @router.post("/{restaurant_id}/reviews", response_model=ReviewOut, status_code=201)
 def create_review(
-    restaurant_id: int,
+    restaurant_id: str,
     payload: ReviewCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
-    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+    restaurant = restaurants_collection.find_one({"_id": to_object_id(restaurant_id)})
     if not restaurant:
         raise HTTPException(status_code=404, detail="Restaurant not found")
 
-    review = Review(
-        user_id=current_user.id,
-        restaurant_id=restaurant_id,
-        rating=payload.rating,
-        comment=payload.comment,
-    )
-    db.add(review)
-    db.commit()
-    db.refresh(review)
+    review_doc = {
+        "user_id": current_user["_id"],
+        "restaurant_id": restaurant_id,
+        "rating": payload.rating,
+        "comment": payload.comment,
+        "photo_url": None,
+        "created_at": datetime.now(timezone.utc),
+    }
 
-    recalculate_restaurant_rating(db, restaurant_id)
+    result = reviews_collection.insert_one(review_doc)
+    review = reviews_collection.find_one({"_id": result.inserted_id})
+
+    recalculate_restaurant_rating(restaurant_id)
 
     return ReviewOut(
-        id=review.id,
-        user_id=review.user_id,
-        restaurant_id=restaurant_id,
-        rating=review.rating,
-        comment=review.comment,
-        photo_url=review.photo_url,
-        created_at=review.created_at,
-        user_name=current_user.name,
+        id=str(review.get("_id")),
+        user_id=review.get("user_id"),
+        restaurant_id=review.get("restaurant_id"),
+        rating=review.get("rating"),
+        comment=review.get("comment"),
+        photo_url=review.get("photo_url"),
+        created_at=review.get("created_at"),
+        user_name=current_user.get("name"),
     )

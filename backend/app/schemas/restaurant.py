@@ -1,6 +1,7 @@
-from pydantic import BaseModel
-from typing import Optional
 from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel
 
 
 class RestaurantCreate(BaseModel):
@@ -22,22 +23,22 @@ class RestaurantUpdate(RestaurantCreate):
 
 
 class RestaurantOut(BaseModel):
-    id: int
+    id: str
     name: str
-    cuisine_type: Optional[str]
-    address: Optional[str]
-    city: Optional[str]
-    zip_code: Optional[str]
-    description: Optional[str]
-    hours: Optional[str]
-    contact_phone: Optional[str]
-    contact_email: Optional[str]
-    pricing_tier: Optional[str]
-    amenities: Optional[str]
-    avg_rating: float
-    review_count: int
-    added_by_user_id: Optional[int]
-    owner_user_id: Optional[int]
-    created_at: datetime
+    cuisine_type: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    zip_code: Optional[str] = None
+    description: Optional[str] = None
+    hours: Optional[str] = None
+    contact_phone: Optional[str] = None
+    contact_email: Optional[str] = None
+    pricing_tier: Optional[str] = None
+    amenities: Optional[str] = None
+    avg_rating: float = 0.0
+    review_count: int = 0
+    added_by_user_id: Optional[str] = None
+    owner_user_id: Optional[str] = None
+    created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
